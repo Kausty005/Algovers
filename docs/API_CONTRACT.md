@@ -168,57 +168,29 @@ http://localhost:5000
 
 ## Payment Endpoints (Agent 3)
 
-### `GET /api/payment/status`
-
-**Response:**
-```json
-{
-  "status": "verified",
-  "sessionId": "pay-abc123",
-  "network": "algorand-testnet",
-  "price": "0.1",
-  "asset": "ALGO",
-  "receiverAddress": "ALGO_ADDRESS..."
-}
-```
-> `status`: `"idle"` | `"required"` | `"processing"` | `"verified"` | `"failed"`
-
----
-
-### `POST /api/payment/session`
+### `POST /api/payment/session` (x402 Protected Resource)
 
 **Request:**
 ```json
 { "exercise": "squat" }
 ```
 
-**Response:**
+**Unpaid Response (Intercepted by Frontend `@x402/fetch`):**
+```http
+HTTP 402 Payment Required
+payment-required: <base64 encoded x402 requirements>
+```
+
+**Paid Response (After Wallet Signature via Facilitator):**
 ```json
 {
   "sessionId": "pay-abc123",
-  "paymentAddress": "ALGORAND_ADDRESS...",
-  "amount": "0.1",
-  "asset": "ALGO",
-  "network": "algorand-testnet",
-  "status": "required"
+  "exercise": "squat",
+  "status": "active"
 }
 ```
 
 ---
-
-## x402 Protected Resource
-
-**Endpoint:** `POST /api/workout/session` (or `/api/workout/start` with x402 middleware)
-
-**Unpaid response:**
-```
-HTTP 402 Payment Required
-```
-
-**Paid response:**
-```
-HTTP 200 + normal session response
-```
 
 ---
 

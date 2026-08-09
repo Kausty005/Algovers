@@ -61,20 +61,23 @@ src/
 ## Payment Flow
 
 ```
-Frontend                Backend (Agent 3)
-   │                          │
-   ├── POST /api/payment/session ──→
-   │ ←── { paymentAddress, amount } ──
-   │                          │
-   │  (user sends ALGO on-chain)
-   │                          │
-   ├── I've Sent Payment ─────────────
-   ├── GET /api/payment/status ──────→
-   │ ←── { status: "verified" } ──────
-   │                          │
-   ├── POST /api/workout/start ──────→
-   │ ←── { sessionId } ───────────────
-   │                          │
+Frontend                Backend (Agent 3)               GoPlausible Facilitator
+   │                          │                                  │
+   ├── POST /api/payment/session ──→                             │
+   │ ←── 402 Payment Required ──────                             │
+   │                          │                                  │
+   │  (x402Fetch intercepts)                                     │
+   │                          │                                  │
+   ├── Wallet signs tx ─────────────                             │
+   │                          │                                  │
+   ├── POST /api/payment/session + Proof ──→                     │
+   │                          │                                  │
+   │                          ├─── Verify Proof ────────────────→│
+   │                          │                                  │
+   │                          ├─── Settle Payment ─────────────→│
+   │                          │                                  │
+   │ ←── 200 OK { sessionId } ──────                             │
+   │                          │                                  │
    [Workout session active]
 ```
 

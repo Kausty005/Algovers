@@ -7,6 +7,7 @@ import {
   Copy,
   Wallet,
 } from 'lucide-react';
+import { useWallet } from '@txnlab/use-wallet-react';
 import type { PaymentStatus, PaymentSessionResponse } from '../types';
 
 interface Props {
@@ -37,6 +38,7 @@ function statusLabel(s: PaymentStatus) {
 
 export function PaymentModal({ open, status, session, error, onClose, onConfirmPayment }: Props) {
   const [copied, setCopied] = useState(false);
+  const { activeAccount, providers } = useWallet();
 
   if (!open) return null;
 
@@ -47,6 +49,16 @@ export function PaymentModal({ open, status, session, error, onClose, onConfirmP
       setTimeout(() => setCopied(false), 2000);
     }
   };
+
+  const getNetworkName = (network: string) => {
+    if (network === 'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDe' || network === 'testnet') return 'Algorand TestNet';
+    return network;
+  }
+
+  const getAssetName = (asset: string) => {
+    if (asset === '10458941') return 'USDC';
+    return asset;
+  }
 
   return (
     /* Backdrop */
@@ -109,9 +121,9 @@ export function PaymentModal({ open, status, session, error, onClose, onConfirmP
             {/* Info rows */}
             {[
               { label: 'Service', value: 'AI Workout Session' },
-              { label: 'Network', value: session.network },
-              { label: 'Asset', value: session.asset },
-              { label: 'Price', value: `${session.amount} ${session.asset}` },
+              { label: 'Network', value: getNetworkName(session.network) },
+              { label: 'Asset', value: getAssetName(session.asset) },
+              { label: 'Price', value: `${session.amount} ${getAssetName(session.asset)}` },
             ].map(({ label, value }) => (
               <div
                 key={label}
@@ -138,7 +150,7 @@ export function PaymentModal({ open, status, session, error, onClose, onConfirmP
               }}
             >
               <span style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', fontWeight: 500, display: 'block', marginBottom: '6px' }}>
-                Payment Address
+                Payment Address (Receiver)
               </span>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <span
@@ -182,14 +194,30 @@ export function PaymentModal({ open, status, session, error, onClose, onConfirmP
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: '12px', flexDirection: 'column' }}>
-          {status === 'required' && (
+          {status === 'required' && !activeAccount && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <p style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Connect Wallet to Pay</p>
+              {providers?.map((provider) => (
+                <button
+                  key={provider.metadata.id}
+                  className="neu-btn"
+                  style={{ padding: '12px 24px', fontSize: '0.95rem', width: '100%' }}
+                  onClick={() => provider.connect()}
+                >
+                  Connect {provider.metadata.name}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {status === 'required' && activeAccount && (
             <button
               className="neu-btn-accent neu-btn"
               style={{ padding: '14px 24px', fontSize: '1rem', width: '100%' }}
               onClick={onConfirmPayment}
             >
               <Wallet size={20} />
-              I've Sent the Payment
+              Pay with Algorand
             </button>
           )}
 

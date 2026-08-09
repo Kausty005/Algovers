@@ -35,26 +35,17 @@ def apply_x402_middleware(app: Flask) -> None:
     This must be called AFTER all routes are registered on *app*.
     """
     if not x402_config.receiver_address:
-        logger.warning(
-            "X402_RECEIVER_ADDRESS is not set. "
-            "The payment middleware will operate in DEMO mode (no real chain verification). "
-            "Set X402_RECEIVER_ADDRESS in .env to enable real Algorand payments."
-        )
-        _apply_demo_middleware(app)
-        return
+        logger.error("X402_RECEIVER_ADDRESS is not set. Real x402 payment configuration is missing.")
+        raise ValueError("X402_RECEIVER_ADDRESS must be set for real TestNet payments.")
 
     try:
         _apply_x402_avm_middleware(app)
-    except ImportError:
-        logger.warning(
-            "x402-avm package not found. "
-            "Install with: pip install \"x402-avm[flask,avm]\". "
-            "Falling back to demo 402 middleware."
-        )
-        _apply_demo_middleware(app)
+    except ImportError as e:
+        logger.error("x402-avm package not found. Install with: pip install \"x402-avm[flask,avm]\".")
+        raise e
     except Exception as exc:
-        logger.error("Failed to apply x402-avm middleware: %s. Falling back to demo.", exc)
-        _apply_demo_middleware(app)
+        logger.error("Failed to apply x402-avm middleware: %s.", exc)
+        raise exc
 
 
 def _apply_x402_avm_middleware(app: Flask) -> None:
@@ -68,6 +59,9 @@ def _apply_x402_avm_middleware(app: Flask) -> None:
         FacilitatorConfig(url=x402_config.facilitator_url)
     )
     server = x402ResourceServerSync(facilitator)
+
+    from x402.mechanisms.avm.exact import ExactAvmServerScheme  # type: ignore
+    server.register("algorand:*", ExactAvmServerScheme())
 
     routes = {
         f"{PROTECTED_METHOD} {PROTECTED_PATH}": RouteConfig(
@@ -87,7 +81,7 @@ def _apply_x402_avm_middleware(app: Flask) -> None:
         )
     }
 
-    app.wsgi_app = payment_middleware(app.wsgi_app, routes=routes, server=server)  # type: ignore
+    payment_middleware(app, routes=routes, server=server)
     logger.info(
         "x402-avm middleware applied to %s %s (network=%s, price=%s %s)",
         PROTECTED_METHOD,

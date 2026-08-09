@@ -24,7 +24,7 @@ export function WorkoutPage() {
   const exerciseType = (exercise as ExerciseType) ?? 'squat';
 
   // ── Payment ──────────────────────────────────────────────────
-  const { status: payStatus, session: paySession, error: payError, initPayment, pollStatus } = usePayment();
+  const { status: payStatus, session: paySession, error: payError, initPayment, confirmPayment } = usePayment();
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [sessionUnlocked, setSessionUnlocked] = useState(false); // require payment
 
@@ -118,7 +118,7 @@ export function WorkoutPage() {
   };
 
   const handlePaymentConfirm = () => {
-    pollStatus();
+    confirmPayment();
   };
 
   return (
