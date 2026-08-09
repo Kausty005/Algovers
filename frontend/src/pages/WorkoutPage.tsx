@@ -13,7 +13,7 @@ import { aiApi, mockAiApi } from '../services/aiApi';
 import type { ExerciseType, GuidanceResponse } from '../types';
 
 const isDev = import.meta.env.DEV;
-const ai = isDev ? mockAiApi : aiApi;
+const ai = aiApi; // Enforce real AI API
 
 // Guidance call cooldown (ms)
 const GUIDANCE_COOLDOWN = 4000;
@@ -26,7 +26,7 @@ export function WorkoutPage() {
   // ── Payment ──────────────────────────────────────────────────
   const { status: payStatus, session: paySession, error: payError, initPayment, pollStatus } = usePayment();
   const [paymentOpen, setPaymentOpen] = useState(false);
-  const [sessionUnlocked, setSessionUnlocked] = useState(isDev); // skip payment in dev mode
+  const [sessionUnlocked, setSessionUnlocked] = useState(false); // require payment
 
   // ── Workout session ───────────────────────────────────────────
   const { session, frameResult, elapsed, loading, error: sessionError, startSession, sendFrame, endSession } = useWorkoutSession();

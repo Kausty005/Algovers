@@ -7,14 +7,39 @@ import type {
 } from '../types';
 
 export const paymentApi = {
-  getStatus: (): Promise<PaymentStatusResponse> =>
-    apiFetch<PaymentStatusResponse>('/api/payment/status'),
+  createSession: async (exercise: ExerciseType, txId?: string): Promise<PaymentSessionResponse> => {
+    const url = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000'}/api/payment/session`;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (txId) {
+      headers['X-PAYMENT'] = txId;
+    }
 
-  createSession: (exercise: ExerciseType): Promise<PaymentSessionResponse> =>
-    apiFetch<PaymentSessionResponse>('/api/payment/session', {
+    const response = await fetch(url, {
       method: 'POST',
-      body: JSON.stringify({ exercise } as PaymentSessionRequest),
-    }),
+      headers,
+      body: JSON.stringify({ exercise }),
+    });
+
+    if (response.status === 402) {
+      const data = await response.json();
+      const accept = data.accepts[0];
+      return {
+        sessionId: 'pending', // Awaiting verification to get real session ID
+        paymentAddress: accept.payTo,
+        amount: accept.maxAmountRequired,
+        asset: accept.asset,
+        network: accept.network,
+        status: 'required',
+      };
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+  },
 };
 
 // ─── MOCK (DEV ONLY) ─────────────────────────────────────────────

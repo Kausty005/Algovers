@@ -2,21 +2,22 @@ import { useState, useCallback } from 'react';
 import type { PaymentStatus, PaymentSessionResponse, ExerciseType } from '../types';
 import { paymentApi, mockPaymentApi } from '../services/paymentApi';
 
-const IS_MOCK = import.meta.env.VITE_API_BASE_URL === undefined;
-const api = IS_MOCK ? mockPaymentApi : paymentApi;
+const api = paymentApi;
 
 export function usePayment() {
   const [status, setStatus] = useState<PaymentStatus>('idle');
   const [session, setSession] = useState<PaymentSessionResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [currentExercise, setCurrentExercise] = useState<ExerciseType>('squat');
 
   const initPayment = useCallback(async (exercise: ExerciseType) => {
+    setCurrentExercise(exercise);
     setStatus('required');
     setError(null);
     try {
       const s = await api.createSession(exercise);
       setSession(s);
-      setStatus('required');
+      setStatus(s.status);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Payment init failed');
       setStatus('failed');
@@ -24,16 +25,17 @@ export function usePayment() {
   }, []);
 
   const pollStatus = useCallback(async () => {
-    if (!session) return;
     setStatus('processing');
     try {
-      const res = await paymentApi.getStatus();
-      setStatus(res.status);
-    } catch {
+      // In a real app we might poll the status API, but for x402 we retry the POST with the TX ID
+      const s = await api.createSession(currentExercise, 'demo-verified-tx-123456789');
+      setSession(s);
+      setStatus(s.status);
+    } catch (err) {
       setStatus('failed');
       setError('Could not verify payment. Please try again.');
     }
-  }, [session]);
+  }, [currentExercise]);
 
   const reset = useCallback(() => {
     setStatus('idle');
