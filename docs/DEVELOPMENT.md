@@ -1,144 +1,178 @@
-# Gym Buddy — Development Guide
+# IronIQ — Development Guide
 
-## Quick Start
+## Frontend (Agent 1)
 
-### Frontend (Agent 1)
+### Prerequisites
+- Node.js 18+
+- npm 9+
+
+### Setup
 ```bash
 cd frontend
 npm install
 cp .env.example .env
-npm run dev
-# Runs on http://localhost:5173
 ```
 
-### Backend (Agent 3 — AI + x402)
+### Run (development)
 ```bash
-cd backend
-python -m venv venv
-# Windows:
-venv\Scripts\activate
-# macOS/Linux:
-source venv/bin/activate
-
-pip install -r requirements.txt
-cp .env.example .env
-# Edit .env with your values (see below)
-
-python run.py
-# Runs on http://localhost:5000
+npm run dev
+# → http://localhost:5173
 ```
 
----
-
-## Environment Variables
-
-### Frontend (`frontend/.env`)
+### Environment Variables
 | Variable | Default | Description |
 |---|---|---|
 | `VITE_API_BASE_URL` | `http://localhost:5000` | Backend base URL |
 
-### Backend (`backend/.env`)
-| Variable | Required | Description |
-|---|---|---|
-| `FLASK_DEBUG` | No | `1` for debug mode |
-| `PORT` | No | Server port (default `5000`) |
-| `FRONTEND_URL` | No | CORS origin (default `http://localhost:5173`) |
-| `GEMINI_API_KEY` | No* | Google Gemini API key — get free at aistudio.google.com |
-| `GEMINI_MODEL` | No | Model name (default `gemini-1.5-flash`) |
-| `X402_NETWORK` | No | `testnet` or `mainnet` (default `testnet`) |
-| `X402_RECEIVER_ADDRESS` | Yes† | Algorand address to receive payments |
-| `X402_FACILITATOR_URL` | No | GoPlausible facilitator (default provided) |
-| `X402_PRICE` | No | Session price in ALGO (default `0.1`) |
-| `X402_ASSET` | No | `ALGO` or ASA ID (default `ALGO`) |
-| `ALGORAND_NODE_URL` | No | Public TestNet node (default provided) |
-| `ALGORAND_INDEXER_URL` | No | Public TestNet indexer (default provided) |
+### Mock Mode
+When the backend is not running, the frontend **automatically uses mock adapters** in development (`import.meta.env.DEV`).  
+Mock adapters are clearly marked in:
+- `src/services/workoutApi.ts` — `mockWorkoutApi`
+- `src/services/aiApi.ts` — `mockAiApi`
+- `src/services/paymentApi.ts` — `mockPaymentApi`
 
-> *Without `GEMINI_API_KEY` the backend uses template-based AI responses (works fine for demos).
-> †Without `X402_RECEIVER_ADDRESS` the x402 middleware runs in DEMO mode (no real chain verification).
+Payment is **bypassed entirely** in dev mode (no modal shown).
+
+### Backend API Dependencies
+| Agent | Endpoints |
+|---|---|
+| Agent 2 (CV) | `POST /api/workout/start`, `POST /api/workout/frame`, `POST /api/workout/end`, `GET /api/workout/report/:id` |
+| Agent 3 (AI) | `POST /api/ai/guidance`, `POST /api/ai/motivation`, `POST /api/ai/chat`, `POST /api/ai/voice` |
+| Agent 3 (Payment) | `GET /api/payment/status`, `POST /api/payment/session` |
+
+### Integration Status
+- [x] Agent 2 (CV Backend) — **complete** (`cv-backend-agent` branch)
+- [ ] Agent 3 (AI + x402 Backend) — waiting for implementation
+- [x] Frontend mock adapters — complete
+- [x] All pages and components — complete
+
+### Assumptions Made
+1. Backend runs on `http://localhost:5000`
+2. The `/api/workout/frame` endpoint accepts `{ sessionId, landmarks: [] }` — landmarks are an array of `{ x, y, z, visibility }` objects
+3. TTS voice endpoint returns raw audio bytes with appropriate Content-Type header
+4. x402 payment is a session-level payment (one payment per workout, not per frame)
+5. In development mode (`import.meta.env.DEV === true`), payment is bypassed and mock data is used
 
 ---
 
-## Running Tests
+## Git Workflow
+
+### Branches
+```
+main
+├── frontend-agent      ← Agent 1 (you are here)
+├── cv-backend-agent    ← Agent 2
+└── ai-x402-agent       ← Agent 3
+```
+
+### Commit Convention
+```
+feat(frontend): add payment modal
+fix(frontend): handle camera permission denial
+feat(cv): add squat rep counter
+feat(x402): add Algorand payment middleware
+```
+
+---
+
+## Running Everything Together
 
 ```bash
+# Terminal 1 — Frontend
+cd frontend
+npm run dev
+
+# Terminal 2 — Backend (after Agent 2/3 implement it)
 cd backend
-venv\Scripts\activate   # Windows
+python run.py
+```
+
+Frontend: `http://localhost:5173`  
+Backend: `http://localhost:5000`
+
+---
+
+## CV + Workout Backend (Agent 2)
+
+### Prerequisites
+- Python 3.11+
+
+### Setup
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # Mac/Linux
 pip install -r requirements.txt
+cp .env.example .env
+```
+
+### Run
+```bash
+python run.py
+# → http://localhost:5000
+# → http://localhost:5000/health  (liveness check)
+```
+
+### Environment Variables
+| Variable | Default | Description |
+|---|---|---|
+| `FLASK_PORT` | `5000` | Server port |
+| `FLASK_DEBUG` | `1` | Enable debug mode |
+| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Allowed CORS origins |
+
+### Run Tests
+```bash
+cd backend
+venv\Scripts\activate
 python -m pytest tests/ -v
 ```
 
-Tests do NOT require `GEMINI_API_KEY` or `X402_RECEIVER_ADDRESS`.
+### Architecture Notes
+- **Frame processing**: The frontend sends pre-extracted MediaPipe landmarks (`x, y, z, visibility`) per frame — the backend never receives raw video, keeping bandwidth low.
+- **Session store**: In-memory for MVP. Swap `session_service.py` for a DB-backed implementation without touching routes.
+- **Adding exercises**: Register a new `ExerciseAnalyzer` subclass in `exercise_service.SUPPORTED_EXERCISES` — no route changes needed.
+- **AI boundary**: CV services produce `formFeedback` strings (short, factual). Agent 3's LLM converts these into natural guidance. CV never calls an LLM.
+- **x402 boundary**: Payment middleware lives entirely in Agent 3. CV routes have no payment logic.
 
----
-
-## API Dependencies
-
-The frontend depends on these backend endpoints:
-
-| Endpoint | Owner | Status |
-|---|---|---|
-| `POST /api/workout/start` | Agent 2 | Pending Agent 2 merge |
-| `POST /api/workout/frame` | Agent 2 | Pending Agent 2 merge |
-| `POST /api/workout/end` | Agent 2 | Pending Agent 2 merge |
-| `GET /api/workout/report/:sessionId` | Agent 2 | Pending Agent 2 merge |
-| `POST /api/ai/guidance` | **Agent 3** ✅ | **Ready** |
-| `POST /api/ai/motivation` | **Agent 3** ✅ | **Ready** |
-| `POST /api/ai/chat` | **Agent 3** ✅ | **Ready** |
-| `POST /api/ai/voice` | **Agent 3** ✅ | **Ready** |
-| `GET /api/payment/status` | **Agent 3** ✅ | **Ready** |
-| `POST /api/payment/session` | **Agent 3** ✅ | **Ready (x402 protected)** |
-| `POST /api/payment/verify` | **Agent 3** ✅ | **Ready** |
-
----
-
-## x402 Payment Flow
-
-```
-Frontend
-  │
-  ├─ POST /api/payment/session (no X-PAYMENT header)
-  │   ← HTTP 402 Payment Required
-  │   ← { accepts: [{ scheme, payTo, price, network }] }
-  │
-  │  [User completes Algorand payment on-chain]
-  │
-  ├─ POST /api/payment/session (with X-PAYMENT: <proof>)
-  │   ← Middleware forwards to facilitator for verification
-  │   ← HTTP 200 { sessionId, status: "verified" }
-  │
-  └─ POST /api/workout/start (session now unlocked)
-```
-
-### Demo Mode (no receiver address set)
-- `POST /api/payment/session` without `X-PAYMENT` → `HTTP 402`
-- `POST /api/payment/session` with `X-PAYMENT: anything` → `HTTP 200`
-
-### Production Mode (with receiver address + x402-avm installed)
-- Real Algorand TestNet payment verification via GoPlausible facilitator
-
----
-
-## AI Fallback Behaviour
-
-| Condition | Behaviour |
+### Supported Exercises
+| Key | Label |
 |---|---|
-| `GEMINI_API_KEY` set | Uses Gemini 1.5 Flash |
-| `GEMINI_API_KEY` not set | Uses curated fitness template responses |
-| Gemini API error | Automatically falls back to templates |
-| TTS (gTTS) network error | Returns `500` with error message |
+| `squat` | Squat |
+| `bicep_curl` | Bicep Curl |
+| `push_up` | Push-Up |
 
----
-
-## Agent Boundaries (do not cross)
-
-| Directory | Owner |
-|---|---|
-| `frontend/` | Agent 1 |
-| `backend/app/routes/workout.py` | Agent 2 |
-| `backend/app/services/` | Agent 2 |
-| `backend/app/ai/` | **Agent 3** |
-| `backend/app/payment/` | **Agent 3** |
-| `backend/app/routes/ai.py` | **Agent 3** |
-| `backend/app/routes/payment.py` | **Agent 3** |
-| `backend/app/__init__.py` | Agent 3 (coordinates with Agent 2) |
-| `docs/API_CONTRACT.md` | All agents (shared) |
+### CV Backend File Map
+```
+backend/
+├── run.py                            ← Entry point
+├── requirements.txt
+├── pytest.ini
+├── conftest.py                       ← pytest sys.path fix
+├── app/
+│   ├── __init__.py                   ← Flask factory + CORS
+│   ├── models/workout.py             ← WorkoutSession, FrameResult, WorkoutReport
+│   ├── utils/
+│   │   ├── angles.py                 ← calculate_angle()
+│   │   └── config.py                 ← env-based config
+│   ├── services/
+│   │   ├── pose_service.py           ← LandmarkIndex + accessors
+│   │   ├── exercise_service.py       ← analyzer factory
+│   │   ├── session_service.py        ← in-memory session store
+│   │   ├── report_service.py         ← report calculation
+│   │   └── analyzers/
+│   │       ├── base.py               ← ExerciseAnalyzer ABC
+│   │       ├── squat.py              ← SquatAnalyzer
+│   │       ├── bicep_curl.py         ← BicepCurlAnalyzer
+│   │       └── push_up.py            ← PushUpAnalyzer
+│   └── routes/
+│       └── workout.py                ← Blueprint: /api/workout/*
+└── tests/
+    ├── landmark_helpers.py           ← Synthetic landmark factory
+    ├── test_angles.py
+    ├── test_squat.py
+    ├── test_bicep_curl.py
+    ├── test_push_up.py
+    ├── test_session.py
+    └── test_report.py
+```
