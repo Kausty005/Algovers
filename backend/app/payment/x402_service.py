@@ -23,9 +23,14 @@ from .x402_config import x402_config
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Route that x402 protects
+# Routes that x402 protects
 # ---------------------------------------------------------------------------
-PROTECTED_PATH = "/api/payment/session"
+PROTECTED_SESSION_PATH = "/api/payment/session"
+PROTECTED_AI_PATHS = {
+    "/api/payment/ai-credits/basic": {"price": "0.05", "desc": "AI Basic Coach (10 Credits)", "model": "gemini-1.5-flash-8b"},
+    "/api/payment/ai-credits/pro": {"price": "0.1", "desc": "AI Pro Coach (10 Credits)", "model": "gemini-1.5-flash"},
+    "/api/payment/ai-credits/expert": {"price": "0.25", "desc": "AI Expert Coach (10 Credits)", "model": "gemini-1.5-pro"},
+}
 PROTECTED_METHOD = "POST"
 
 
@@ -70,12 +75,12 @@ def _apply_x402_avm_middleware(app: Flask) -> None:
     server = x402ResourceServerSync(facilitator)
 
     routes = {
-        f"{PROTECTED_METHOD} {PROTECTED_PATH}": RouteConfig(
+        f"{PROTECTED_METHOD} {PROTECTED_SESSION_PATH}": RouteConfig(
             accepts=[
                 PaymentOption(
                     scheme="exact",
                     pay_to=x402_config.receiver_address,
-                    price=f"${x402_config.price}",  # x402 uses dollar-prefixed amounts
+                    price=f"${x402_config.price}",
                     network=x402_config.network,
                 )
             ],
@@ -87,14 +92,25 @@ def _apply_x402_avm_middleware(app: Flask) -> None:
         )
     }
 
+    # Add AI credit routes
+    for path, info in PROTECTED_AI_PATHS.items():
+        routes[f"{PROTECTED_METHOD} {path}"] = RouteConfig(
+            accepts=[
+                PaymentOption(
+                    scheme="exact",
+                    pay_to=x402_config.receiver_address,
+                    price=f"${info['price']}",
+                    network=x402_config.network,
+                )
+            ],
+            mime_type="application/json",
+            description=f"{info['desc']} — {info['price']} {x402_config.asset}",
+        )
+
     app.wsgi_app = payment_middleware(app.wsgi_app, routes=routes, server=server)  # type: ignore
     logger.info(
-        "x402-avm middleware applied to %s %s (network=%s, price=%s %s)",
-        PROTECTED_METHOD,
-        PROTECTED_PATH,
-        x402_config.network,
-        x402_config.price,
-        x402_config.asset,
+        "x402-avm middleware applied to %s and AI credit routes",
+        PROTECTED_SESSION_PATH
     )
 
 
@@ -113,10 +129,17 @@ def _apply_demo_middleware(app: Flask) -> None:
         path = environ.get("PATH_INFO", "")
         method = environ.get("REQUEST_METHOD", "")
 
-        if path == PROTECTED_PATH and method == PROTECTED_METHOD:
+        if method == PROTECTED_METHOD and (path == PROTECTED_SESSION_PATH or path in PROTECTED_AI_PATHS):
             x_payment = environ.get("HTTP_X_PAYMENT", "")
 
             if not x_payment:
+                # Determine price and desc
+                price = x402_config.price
+                desc = "Gym Buddy workout session"
+                if path in PROTECTED_AI_PATHS:
+                    price = PROTECTED_AI_PATHS[path]["price"]
+                    desc = PROTECTED_AI_PATHS[path]["desc"]
+
                 # Return 402 Payment Required
                 import json
                 body = json.dumps({
@@ -127,10 +150,10 @@ def _apply_demo_middleware(app: Flask) -> None:
                             "scheme": "exact",
                             "network": x402_config.network,
                             "payTo": x402_config.receiver_address or "SET_X402_RECEIVER_ADDRESS",
-                            "maxAmountRequired": x402_config.price,
+                            "maxAmountRequired": price,
                             "asset": x402_config.asset,
                             "extra": {
-                                "description": "Gym Buddy workout session",
+                                "description": desc,
                                 "facilitator": x402_config.facilitator_url,
                             },
                         }
@@ -154,8 +177,5 @@ def _apply_demo_middleware(app: Flask) -> None:
 
     app.wsgi_app = demo_middleware  # type: ignore
     logger.info(
-        "DEMO x402 middleware applied to %s %s "
-        "(no real chain verification — for development only)",
-        PROTECTED_METHOD,
-        PROTECTED_PATH,
+        "DEMO x402 middleware applied (no real chain verification — for development only)",
     )

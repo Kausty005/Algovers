@@ -4,6 +4,8 @@ import type { ChatMessage } from '../types';
 import { aiApi, mockAiApi } from '../services/aiApi';
 
 const isDev = import.meta.env.DEV;
+const api = aiApi; // Enforce real AI API so users can test real models
+
 
 function genId() {
   return Math.random().toString(36).slice(2);
@@ -16,7 +18,13 @@ const STARTERS = [
   'How many reps should I aim for?',
 ];
 
-export function Chatbot() {
+interface Props {
+  sessionId: string;
+  onOutOfCredits: () => void;
+  onCreditsUpdated: (credits: number) => void;
+}
+
+export function Chatbot({ sessionId, onOutOfCredits, onCreditsUpdated }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -43,8 +51,12 @@ export function Chatbot() {
     setLoading(true);
 
     try {
-      const api = isDev ? mockAiApi : aiApi;
-      const res = await api.chat({ message: text });
+      const res = await api.chat({ message: text, sessionId });
+      
+      if (res.creditsRemaining !== undefined) {
+        onCreditsUpdated(res.creditsRemaining);
+      }
+
       const aiMsg: ChatMessage = {
         id: genId(),
         role: 'assistant',
@@ -52,7 +64,24 @@ export function Chatbot() {
         timestamp: Date.now(),
       };
       setMessages((m) => [...m, aiMsg]);
-    } catch (err) {
+    } catch (err: any) {
+      try {
+        const errorData = JSON.parse(err.message);
+        if (errorData.code === 'NO_CREDITS') {
+           onOutOfCredits();
+           // Remove the user's message since it didn't send
+           setMessages((m) => m.filter(msg => msg.id !== userMsg.id));
+           return;
+        }
+      } catch (e) {
+        // Not JSON
+      }
+      
+      if (err.message?.includes('403') || err.message?.includes('NO_CREDITS')) {
+         onOutOfCredits();
+         setMessages((m) => m.filter(msg => msg.id !== userMsg.id));
+         return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to get response. Backend may be offline.');
     } finally {
       setLoading(false);

@@ -39,7 +39,7 @@ def _is_medical_question(message: str) -> bool:
 class ChatbotAI:
     """Fitness-focused conversational AI."""
 
-    def chat(self, message: str) -> dict:
+    def chat(self, message: str, model_name: str | None = None) -> dict:
         """Return ``{"response": str}``."""
         if _is_medical_question(message):
             return {
@@ -53,7 +53,13 @@ class ChatbotAI:
         prompt = f"{_SYSTEM_PROMPT}\n\nUser: {message}\nGym Buddy:"
 
         fallback = _template_chat(message)
-        response = ai_provider.generate(prompt, max_tokens=150, temperature=0.7, fallback=fallback)
+        response = ai_provider.generate(
+            prompt, 
+            max_tokens=150, 
+            temperature=0.7, 
+            fallback=fallback, 
+            model_name=model_name
+        )
 
         # Strip any leading "Gym Buddy:" the model might echo
         response = response.strip()

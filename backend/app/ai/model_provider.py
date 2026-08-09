@@ -96,13 +96,13 @@ def _template_chat(message: str) -> str:
 # Gemini client
 # ---------------------------------------------------------------------------
 
-_gemini_model = None  # lazy-initialised
+_gemini_models = {}  # lazy-initialised dict of models
 
 
-def _get_gemini_model():
-    global _gemini_model
-    if _gemini_model is not None:
-        return _gemini_model
+def _get_gemini_model(model_name: str):
+    global _gemini_models
+    if model_name in _gemini_models:
+        return _gemini_models[model_name]
 
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
@@ -112,10 +112,9 @@ def _get_gemini_model():
         import google.generativeai as genai  # type: ignore
 
         genai.configure(api_key=api_key)
-        model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-        _gemini_model = genai.GenerativeModel(model_name)
+        _gemini_models[model_name] = genai.GenerativeModel(model_name)
         logger.info("Gemini model initialised: %s", model_name)
-        return _gemini_model
+        return _gemini_models[model_name]
     except Exception as exc:
         logger.warning("Failed to initialise Gemini: %s", exc)
         return None
@@ -139,12 +138,17 @@ class AIModelProvider:
         max_tokens: int = 200,
         temperature: float = 0.7,
         fallback: str | None = None,
+        model_name: str | None = None,
     ) -> str:
         """Generate text from *prompt*.
 
         Returns *fallback* if both Gemini and the fallback logic fail.
         """
-        model = _get_gemini_model()
+        # Default fallback model if not specified
+        if not model_name:
+            model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+
+        model = _get_gemini_model(model_name)
         if model:
             try:
                 response = model.generate_content(
