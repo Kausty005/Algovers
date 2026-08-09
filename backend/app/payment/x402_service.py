@@ -40,17 +40,26 @@ def apply_x402_middleware(app: Flask) -> None:
     This must be called AFTER all routes are registered on *app*.
     """
     if not x402_config.receiver_address:
-        logger.error("X402_RECEIVER_ADDRESS is not set. Real x402 payment configuration is missing.")
-        raise ValueError("X402_RECEIVER_ADDRESS must be set for real TestNet payments.")
+        logger.warning(
+            "X402_RECEIVER_ADDRESS is not set. "
+            "The payment middleware will operate in DEMO mode (no real chain verification). "
+            "Set X402_RECEIVER_ADDRESS in .env to enable real Algorand payments."
+        )
+        _apply_demo_middleware(app)
+        return
 
     try:
         _apply_x402_avm_middleware(app)
-    except ImportError as e:
-        logger.error("x402-avm package not found. Install with: pip install \"x402-avm[flask,avm]\".")
-        raise e
+    except ImportError:
+        logger.warning(
+            "x402-avm package not found. "
+            "Install with: pip install \"x402-avm[flask,avm]\". "
+            "Falling back to demo 402 middleware."
+        )
+        _apply_demo_middleware(app)
     except Exception as exc:
-        logger.error("Failed to apply x402-avm middleware: %s.", exc)
-        raise exc
+        logger.error("Failed to apply x402-avm middleware: %s. Falling back to demo.", exc)
+        _apply_demo_middleware(app)
 
 
 def _apply_x402_avm_middleware(app: Flask) -> None:

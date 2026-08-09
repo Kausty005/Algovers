@@ -38,7 +38,7 @@ function statusLabel(s: PaymentStatus) {
 
 export function PaymentModal({ open, status, session, error, onClose, onConfirmPayment }: Props) {
   const [copied, setCopied] = useState(false);
-  const { activeAccount, providers } = useWallet();
+  const { activeAccount, wallets } = useWallet();
 
   if (!open) return null;
 
@@ -197,14 +197,14 @@ export function PaymentModal({ open, status, session, error, onClose, onConfirmP
           {status === 'required' && !activeAccount && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <p style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Connect Wallet to Pay</p>
-              {providers?.map((provider) => (
+              {wallets?.map((wallet) => (
                 <button
-                  key={provider.metadata.id}
+                  key={wallet.id}
                   className="neu-btn"
                   style={{ padding: '12px 24px', fontSize: '0.95rem', width: '100%' }}
-                  onClick={() => provider.connect()}
+                  onClick={() => wallet.connect()}
                 >
-                  Connect {provider.metadata.name}
+                  Connect {wallet.metadata.name}
                 </button>
               ))}
             </div>

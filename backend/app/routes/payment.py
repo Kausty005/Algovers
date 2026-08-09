@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from ..payment.algorand_service import algorand_service
 
@@ -47,6 +48,7 @@ def payment_status():
 # ---------------------------------------------------------------------------
 
 @payment_bp.route("/session", methods=["POST"])
+@jwt_required()
 def payment_session():
     """Create / verify a payment session.
 
@@ -138,6 +140,7 @@ def verify_tx():
 # ---------------------------------------------------------------------------
 
 @payment_bp.route("/ai-credits/<tier>", methods=["POST"])
+@jwt_required()
 def payment_ai_credits(tier: str):
     """Buy AI credits.
     Protected by x402 middleware.
@@ -155,8 +158,10 @@ def payment_ai_credits(tier: str):
     # If we reached here, payment is verified. Add 10 credits.
     from ..services.credit_service import add_credits
     tier_info = PROTECTED_AI_PATHS[path]
+    
+    user_id = get_jwt_identity()
     session_data = add_credits(
-        session_id=session_id,
+        user_id=user_id,
         amount=10,
         model_name=tier_info["model"],
         tier=tier

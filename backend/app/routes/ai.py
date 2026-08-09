@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 from flask import Blueprint, request, jsonify, Response
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from ..ai.guidance import guidance_ai
 from ..ai.motivation import motivation_ai
@@ -110,31 +111,31 @@ def motivation():
 # ---------------------------------------------------------------------------
 
 @ai_bp.route("/chat", methods=["POST"])
+@jwt_required()
 def chat():
     """Fitness chatbot endpoint with credit enforcement.
 
-    Request:  { "message": "How can I improve my squat?", "sessionId": "chat-123" }
+    Request:  { "message": "How can I improve my squat?" }
     Response: { "response": "Focus on keeping your knees aligned...", "creditsRemaining": 9 }
     """
     data = request.get_json(silent=True) or {}
     message = str(data.get("message", "")).strip()
-    session_id = str(data.get("sessionId", "")).strip()
 
     if not message:
         return _bad_request("Missing required field: message")
-    if not session_id:
-        return _bad_request("Missing required field: sessionId")
+
+    user_id = get_jwt_identity()
 
     from ..services.credit_service import get_credits, deduct_credit
     
-    session_data = get_credits(session_id)
+    session_data = get_credits(user_id)
     if not session_data or session_data["credits"] <= 0:
         return jsonify({"error": "Insufficient credits", "code": "NO_CREDITS"}), 403
 
     model_name = session_data["model_name"]
     
     # Deduct credit before processing (or after, but before is safer)
-    if not deduct_credit(session_id):
+    if not deduct_credit(user_id):
         return jsonify({"error": "Insufficient credits", "code": "NO_CREDITS"}), 403
 
     try:
@@ -145,7 +146,7 @@ def chat():
         logger.exception("Chat error")
         # Refund credit if AI failed
         from ..services.credit_service import add_credits
-        add_credits(session_id, 1, model_name, session_data["tier"])
+        add_credits(user_id, 1, model_name, session_data["tier"])
         return _server_error(f"Chat error: {exc}")
 
 

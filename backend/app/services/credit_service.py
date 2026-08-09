@@ -1,38 +1,54 @@
 """
 Gym Buddy — AI Credit Tracking Service
-In-memory store for AI credits. In a production app, this would be backed by a database.
+Stores AI credits in MongoDB.
 """
 
 from typing import Dict, Optional, TypedDict
+from app.db import get_db
+from bson.objectid import ObjectId
 
 class AICreditSession(TypedDict):
     credits: int
     model_name: str
     tier: str
 
-# In-memory store mapping session ID to credit session
-_credit_store: Dict[str, AICreditSession] = {}
+def get_credits(user_id: str) -> Optional[AICreditSession]:
+    db = get_db()
+    user = db.users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return None
+        
+    ai_state = user.get("ai_state", {})
+    return {
+        "credits": ai_state.get("credits", 0),
+        "model_name": ai_state.get("model_name", "gemini-1.5-flash-8b"),
+        "tier": ai_state.get("tier", "basic")
+    }
 
-def get_credits(session_id: str) -> Optional[AICreditSession]:
-    return _credit_store.get(session_id)
-
-def add_credits(session_id: str, amount: int, model_name: str, tier: str) -> AICreditSession:
-    if session_id in _credit_store:
-        _credit_store[session_id]["credits"] += amount
-        _credit_store[session_id]["model_name"] = model_name
-        _credit_store[session_id]["tier"] = tier
-    else:
-        _credit_store[session_id] = {
-            "credits": amount,
-            "model_name": model_name,
-            "tier": tier
+def add_credits(user_id: str, amount: int, model_name: str, tier: str) -> AICreditSession:
+    db = get_db()
+    db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {
+            "$inc": {"ai_state.credits": amount},
+            "$set": {
+                "ai_state.model_name": model_name,
+                "ai_state.tier": tier
+            }
         }
-    return _credit_store[session_id]
+    )
+    return get_credits(user_id)
 
-def deduct_credit(session_id: str) -> bool:
+def deduct_credit(user_id: str) -> bool:
     """Deduct one credit. Return True if successful, False if out of credits."""
-    session = _credit_store.get(session_id)
-    if not session or session["credits"] <= 0:
+    db = get_db()
+    user = db.users.find_one({"_id": ObjectId(user_id)})
+    
+    if not user or user.get("ai_state", {}).get("credits", 0) <= 0:
         return False
-    session["credits"] -= 1
+        
+    db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$inc": {"ai_state.credits": -1}}
+    )
     return True

@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useWallet } from '@txnlab/use-wallet-react';
-import { x402Client } from '@x402/core';
+import { x402Client } from '@x402/core/client';
 import { wrapFetchWithPayment } from '@x402/fetch';
-import { ExactAvmClient } from '@x402/avm';
+import { ExactAvmScheme } from '@x402/avm/exact/client';
 import type { PaymentStatus, PaymentSessionResponse, ExerciseType } from '../types';
 import { paymentApi } from '../services/paymentApi';
 
@@ -46,7 +46,7 @@ export function usePayment() {
         }
       };
 
-      const client = new x402Client().register('algorand:*', new ExactAvmClient(signer));
+      const client = new x402Client().register('algorand:*', new ExactAvmScheme(signer));
       const fetchWithPayment = wrapFetchWithPayment(window.fetch, client);
 
       // 2. Retry the request with the payment wrapper

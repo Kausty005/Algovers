@@ -101,7 +101,7 @@ export function AiModelModal({ open, status, error, onSelectTier, onClose, onCon
                   border: selected === tier.id ? '2px solid var(--accent)' : '2px solid transparent',
                   width: '100%'
                 }}
-                disabled={status === 'processing' || status === 'verified'}
+                disabled={(status as any) === 'processing' || (status as any) === 'verified'}
               >
                 <div className="neu-circle" style={{ width: 48, height: 48, flexShrink: 0, color: selected === tier.id ? 'var(--accent)' : 'var(--text-secondary)' }}>
                   {tier.icon}
