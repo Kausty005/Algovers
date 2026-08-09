@@ -41,7 +41,7 @@ Payment is **bypassed entirely** in dev mode (no modal shown).
 | Agent 3 (Payment) | `GET /api/payment/status`, `POST /api/payment/session` |
 
 ### Integration Status
-- [ ] Agent 2 (CV Backend) — waiting for implementation
+- [x] Agent 2 (CV Backend) — **complete** (`cv-backend-agent` branch)
 - [ ] Agent 3 (AI + x402 Backend) — waiting for implementation
 - [x] Frontend mock adapters — complete
 - [x] All pages and components — complete
@@ -89,3 +89,90 @@ python run.py
 
 Frontend: `http://localhost:5173`  
 Backend: `http://localhost:5000`
+
+---
+
+## CV + Workout Backend (Agent 2)
+
+### Prerequisites
+- Python 3.11+
+
+### Setup
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate          # Windows
+# source venv/bin/activate     # Mac/Linux
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+### Run
+```bash
+python run.py
+# → http://localhost:5000
+# → http://localhost:5000/health  (liveness check)
+```
+
+### Environment Variables
+| Variable | Default | Description |
+|---|---|---|
+| `FLASK_PORT` | `5000` | Server port |
+| `FLASK_DEBUG` | `1` | Enable debug mode |
+| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000` | Allowed CORS origins |
+
+### Run Tests
+```bash
+cd backend
+venv\Scripts\activate
+python -m pytest tests/ -v
+```
+
+### Architecture Notes
+- **Frame processing**: The frontend sends pre-extracted MediaPipe landmarks (`x, y, z, visibility`) per frame — the backend never receives raw video, keeping bandwidth low.
+- **Session store**: In-memory for MVP. Swap `session_service.py` for a DB-backed implementation without touching routes.
+- **Adding exercises**: Register a new `ExerciseAnalyzer` subclass in `exercise_service.SUPPORTED_EXERCISES` — no route changes needed.
+- **AI boundary**: CV services produce `formFeedback` strings (short, factual). Agent 3's LLM converts these into natural guidance. CV never calls an LLM.
+- **x402 boundary**: Payment middleware lives entirely in Agent 3. CV routes have no payment logic.
+
+### Supported Exercises
+| Key | Label |
+|---|---|
+| `squat` | Squat |
+| `bicep_curl` | Bicep Curl |
+| `push_up` | Push-Up |
+
+### CV Backend File Map
+```
+backend/
+├── run.py                            ← Entry point
+├── requirements.txt
+├── pytest.ini
+├── conftest.py                       ← pytest sys.path fix
+├── app/
+│   ├── __init__.py                   ← Flask factory + CORS
+│   ├── models/workout.py             ← WorkoutSession, FrameResult, WorkoutReport
+│   ├── utils/
+│   │   ├── angles.py                 ← calculate_angle()
+│   │   └── config.py                 ← env-based config
+│   ├── services/
+│   │   ├── pose_service.py           ← LandmarkIndex + accessors
+│   │   ├── exercise_service.py       ← analyzer factory
+│   │   ├── session_service.py        ← in-memory session store
+│   │   ├── report_service.py         ← report calculation
+│   │   └── analyzers/
+│   │       ├── base.py               ← ExerciseAnalyzer ABC
+│   │       ├── squat.py              ← SquatAnalyzer
+│   │       ├── bicep_curl.py         ← BicepCurlAnalyzer
+│   │       └── push_up.py            ← PushUpAnalyzer
+│   └── routes/
+│       └── workout.py                ← Blueprint: /api/workout/*
+└── tests/
+    ├── landmark_helpers.py           ← Synthetic landmark factory
+    ├── test_angles.py
+    ├── test_squat.py
+    ├── test_bicep_curl.py
+    ├── test_push_up.py
+    ├── test_session.py
+    └── test_report.py
+```
