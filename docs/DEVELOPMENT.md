@@ -1,91 +1,144 @@
-# IronIQ — Development Guide
+# Gym Buddy — Development Guide
 
-## Frontend (Agent 1)
+## Quick Start
 
-### Prerequisites
-- Node.js 18+
-- npm 9+
-
-### Setup
+### Frontend (Agent 1)
 ```bash
 cd frontend
 npm install
 cp .env.example .env
-```
-
-### Run (development)
-```bash
 npm run dev
-# → http://localhost:5173
+# Runs on http://localhost:5173
 ```
 
-### Environment Variables
+### Backend (Agent 3 — AI + x402)
+```bash
+cd backend
+python -m venv venv
+# Windows:
+venv\Scripts\activate
+# macOS/Linux:
+source venv/bin/activate
+
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env with your values (see below)
+
+python run.py
+# Runs on http://localhost:5000
+```
+
+---
+
+## Environment Variables
+
+### Frontend (`frontend/.env`)
 | Variable | Default | Description |
 |---|---|---|
 | `VITE_API_BASE_URL` | `http://localhost:5000` | Backend base URL |
 
-### Mock Mode
-When the backend is not running, the frontend **automatically uses mock adapters** in development (`import.meta.env.DEV`).  
-Mock adapters are clearly marked in:
-- `src/services/workoutApi.ts` — `mockWorkoutApi`
-- `src/services/aiApi.ts` — `mockAiApi`
-- `src/services/paymentApi.ts` — `mockPaymentApi`
+### Backend (`backend/.env`)
+| Variable | Required | Description |
+|---|---|---|
+| `FLASK_DEBUG` | No | `1` for debug mode |
+| `PORT` | No | Server port (default `5000`) |
+| `FRONTEND_URL` | No | CORS origin (default `http://localhost:5173`) |
+| `GEMINI_API_KEY` | No* | Google Gemini API key — get free at aistudio.google.com |
+| `GEMINI_MODEL` | No | Model name (default `gemini-1.5-flash`) |
+| `X402_NETWORK` | No | `testnet` or `mainnet` (default `testnet`) |
+| `X402_RECEIVER_ADDRESS` | Yes† | Algorand address to receive payments |
+| `X402_FACILITATOR_URL` | No | GoPlausible facilitator (default provided) |
+| `X402_PRICE` | No | Session price in ALGO (default `0.1`) |
+| `X402_ASSET` | No | `ALGO` or ASA ID (default `ALGO`) |
+| `ALGORAND_NODE_URL` | No | Public TestNet node (default provided) |
+| `ALGORAND_INDEXER_URL` | No | Public TestNet indexer (default provided) |
 
-Payment is **bypassed entirely** in dev mode (no modal shown).
-
-### Backend API Dependencies
-| Agent | Endpoints |
-|---|---|
-| Agent 2 (CV) | `POST /api/workout/start`, `POST /api/workout/frame`, `POST /api/workout/end`, `GET /api/workout/report/:id` |
-| Agent 3 (AI) | `POST /api/ai/guidance`, `POST /api/ai/motivation`, `POST /api/ai/chat`, `POST /api/ai/voice` |
-| Agent 3 (Payment) | `GET /api/payment/status`, `POST /api/payment/session` |
-
-### Integration Status
-- [ ] Agent 2 (CV Backend) — waiting for implementation
-- [ ] Agent 3 (AI + x402 Backend) — waiting for implementation
-- [x] Frontend mock adapters — complete
-- [x] All pages and components — complete
-
-### Assumptions Made
-1. Backend runs on `http://localhost:5000`
-2. The `/api/workout/frame` endpoint accepts `{ sessionId, landmarks: [] }` — landmarks are an array of `{ x, y, z, visibility }` objects
-3. TTS voice endpoint returns raw audio bytes with appropriate Content-Type header
-4. x402 payment is a session-level payment (one payment per workout, not per frame)
-5. In development mode (`import.meta.env.DEV === true`), payment is bypassed and mock data is used
+> *Without `GEMINI_API_KEY` the backend uses template-based AI responses (works fine for demos).
+> †Without `X402_RECEIVER_ADDRESS` the x402 middleware runs in DEMO mode (no real chain verification).
 
 ---
 
-## Git Workflow
-
-### Branches
-```
-main
-├── frontend-agent      ← Agent 1 (you are here)
-├── cv-backend-agent    ← Agent 2
-└── ai-x402-agent       ← Agent 3
-```
-
-### Commit Convention
-```
-feat(frontend): add payment modal
-fix(frontend): handle camera permission denial
-feat(cv): add squat rep counter
-feat(x402): add Algorand payment middleware
-```
-
----
-
-## Running Everything Together
+## Running Tests
 
 ```bash
-# Terminal 1 — Frontend
-cd frontend
-npm run dev
-
-# Terminal 2 — Backend (after Agent 2/3 implement it)
 cd backend
-python run.py
+venv\Scripts\activate   # Windows
+pip install -r requirements.txt
+python -m pytest tests/ -v
 ```
 
-Frontend: `http://localhost:5173`  
-Backend: `http://localhost:5000`
+Tests do NOT require `GEMINI_API_KEY` or `X402_RECEIVER_ADDRESS`.
+
+---
+
+## API Dependencies
+
+The frontend depends on these backend endpoints:
+
+| Endpoint | Owner | Status |
+|---|---|---|
+| `POST /api/workout/start` | Agent 2 | Pending Agent 2 merge |
+| `POST /api/workout/frame` | Agent 2 | Pending Agent 2 merge |
+| `POST /api/workout/end` | Agent 2 | Pending Agent 2 merge |
+| `GET /api/workout/report/:sessionId` | Agent 2 | Pending Agent 2 merge |
+| `POST /api/ai/guidance` | **Agent 3** ✅ | **Ready** |
+| `POST /api/ai/motivation` | **Agent 3** ✅ | **Ready** |
+| `POST /api/ai/chat` | **Agent 3** ✅ | **Ready** |
+| `POST /api/ai/voice` | **Agent 3** ✅ | **Ready** |
+| `GET /api/payment/status` | **Agent 3** ✅ | **Ready** |
+| `POST /api/payment/session` | **Agent 3** ✅ | **Ready (x402 protected)** |
+| `POST /api/payment/verify` | **Agent 3** ✅ | **Ready** |
+
+---
+
+## x402 Payment Flow
+
+```
+Frontend
+  │
+  ├─ POST /api/payment/session (no X-PAYMENT header)
+  │   ← HTTP 402 Payment Required
+  │   ← { accepts: [{ scheme, payTo, price, network }] }
+  │
+  │  [User completes Algorand payment on-chain]
+  │
+  ├─ POST /api/payment/session (with X-PAYMENT: <proof>)
+  │   ← Middleware forwards to facilitator for verification
+  │   ← HTTP 200 { sessionId, status: "verified" }
+  │
+  └─ POST /api/workout/start (session now unlocked)
+```
+
+### Demo Mode (no receiver address set)
+- `POST /api/payment/session` without `X-PAYMENT` → `HTTP 402`
+- `POST /api/payment/session` with `X-PAYMENT: anything` → `HTTP 200`
+
+### Production Mode (with receiver address + x402-avm installed)
+- Real Algorand TestNet payment verification via GoPlausible facilitator
+
+---
+
+## AI Fallback Behaviour
+
+| Condition | Behaviour |
+|---|---|
+| `GEMINI_API_KEY` set | Uses Gemini 1.5 Flash |
+| `GEMINI_API_KEY` not set | Uses curated fitness template responses |
+| Gemini API error | Automatically falls back to templates |
+| TTS (gTTS) network error | Returns `500` with error message |
+
+---
+
+## Agent Boundaries (do not cross)
+
+| Directory | Owner |
+|---|---|
+| `frontend/` | Agent 1 |
+| `backend/app/routes/workout.py` | Agent 2 |
+| `backend/app/services/` | Agent 2 |
+| `backend/app/ai/` | **Agent 3** |
+| `backend/app/payment/` | **Agent 3** |
+| `backend/app/routes/ai.py` | **Agent 3** |
+| `backend/app/routes/payment.py` | **Agent 3** |
+| `backend/app/__init__.py` | Agent 3 (coordinates with Agent 2) |
+| `docs/API_CONTRACT.md` | All agents (shared) |
