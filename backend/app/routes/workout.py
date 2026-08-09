@@ -90,11 +90,18 @@ def process_frame() -> Response:
     data = request.get_json(silent=True) or {}
     session_id = data.get("sessionId", "").strip()
     landmarks = data.get("landmarks", [])
+    image_b64 = data.get("image", "")
 
     if not session_id:
         return _error("'sessionId' is required.")
+
+    # If frontend didn't send pre-extracted landmarks, but sent a raw image, extract them here
+    if (not landmarks or len(landmarks) == 0) and image_b64:
+        from app.services.pose_service import extract_landmarks_from_b64
+        landmarks = extract_landmarks_from_b64(image_b64)
+
     if not isinstance(landmarks, list) or len(landmarks) < 1:
-        return _error("'landmarks' must be a non-empty list.")
+        return _error("'landmarks' must be a non-empty list (or valid 'image' must be provided).")
 
     session = session_service.get_session(session_id)
     if session is None:

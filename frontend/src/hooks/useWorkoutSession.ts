@@ -28,10 +28,10 @@ export function useWorkoutSession() {
   }, []);
 
   const sendFrame = useCallback(
-    async (landmarks: unknown[]) => {
+    async (landmarks: unknown[], image?: string) => {
       if (!session) return null;
       try {
-        const result = await workoutApi.sendFrame(session.sessionId, landmarks);
+        const result = await workoutApi.sendFrame(session.sessionId, landmarks, image);
         setFrameResult(result);
         return result;
       } catch {

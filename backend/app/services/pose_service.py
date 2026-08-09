@@ -14,6 +14,26 @@ Landmark index reference (MediaPipe Pose 33 landmarks):
 """
 from __future__ import annotations
 from typing import List, Dict, Optional
+import base64
+import cv2
+import numpy as np
+
+# Global MediaPipe Pose instance (lazy-loaded to save import time if unused)
+_pose_instance = None
+
+def _get_pose():
+    global _pose_instance
+    if _pose_instance is None:
+        import mediapipe as mp
+        from mediapipe.tasks import python
+        from mediapipe.tasks.python import vision
+        
+        base_options = python.BaseOptions(model_asset_path='pose_landmarker_lite.task')
+        options = vision.PoseLandmarkerOptions(
+            base_options=base_options,
+            running_mode=vision.RunningMode.IMAGE)
+        _pose_instance = vision.PoseLandmarker.create_from_options(options)
+    return _pose_instance
 
 
 # MediaPipe Pose landmark indices
@@ -56,3 +76,48 @@ def get_landmark_xy(landmarks: Landmarks, idx: int) -> Optional[List[float]]:
     if pt is None:
         return None
     return pt[:2]
+
+
+def extract_landmarks_from_b64(b64_str: str) -> Landmarks:
+    """
+    Decodes a base64 image (data:image/jpeg;base64,...) and runs MediaPipe Pose
+    to extract 33 landmarks, formatted identically to frontend output.
+    """
+    if not b64_str:
+        return []
+
+    # Strip data URL prefix if present
+    if "," in b64_str:
+        b64_str = b64_str.split(",")[1]
+
+    try:
+        img_data = base64.b64decode(b64_str)
+        nparr = np.frombuffer(img_data, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if img is None:
+            return []
+            
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        pose = _get_pose()
+        import mediapipe as mp
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
+        results = pose.detect(mp_image)
+        
+        if not results.pose_landmarks:
+            return []
+            
+        landmarks = []
+        # results.pose_landmarks is a list of lists (one per detected person)
+        for lm in results.pose_landmarks[0]:
+            landmarks.append({
+                "x": lm.x,
+                "y": lm.y,
+                "z": lm.z,
+                "visibility": getattr(lm, "visibility", getattr(lm, "presence", 1.0))
+            })
+        return landmarks
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to extract landmarks: %s", e)
+        return []
+

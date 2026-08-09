@@ -178,12 +178,12 @@ export function WorkoutPage() {
           {/* Camera */}
           <WorkoutCamera
             active={sessionUnlocked && workoutStarted}
-            onFrame={(_frame) => {
-              // Backend may accept raw frame or landmarks
-              // For now send empty landmarks; Agent 2 will specify
-              sendFrame([]);
+            onFrame={(landmarks) => {
+              if (landmarks && landmarks.length > 0) {
+                sendFrame(landmarks);
+              }
             }}
-            frameInterval={500}
+            frameInterval={100}
           />
 
           {/* Error */}

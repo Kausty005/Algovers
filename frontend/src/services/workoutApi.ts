@@ -17,11 +17,12 @@ export const workoutApi = {
   /** Send a processed frame / landmarks to backend */
   sendFrame: (
     sessionId: string,
-    landmarks: unknown[]
+    landmarks: unknown[],
+    image?: string
   ): Promise<FrameResult> =>
     apiFetch<FrameResult>('/api/workout/frame', {
       method: 'POST',
-      body: JSON.stringify({ sessionId, landmarks }),
+      body: JSON.stringify({ sessionId, landmarks, image }),
     }),
 
   /** End the current session */
@@ -43,7 +44,7 @@ export const mockWorkoutApi = {
     exercise,
     status: 'active',
   }),
-  sendFrame: async (_sessionId: string, _landmarks: unknown[]): Promise<FrameResult> => ({
+  sendFrame: async (_sessionId: string, _landmarks: unknown[], _image?: string): Promise<FrameResult> => ({
     sessionId: _sessionId,
     repCount: Math.floor(Math.random() * 15),
     movementState: 'ascending',
