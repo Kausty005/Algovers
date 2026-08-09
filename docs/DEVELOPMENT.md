@@ -31,18 +31,18 @@ Mock adapters are clearly marked in:
 - `src/services/aiApi.ts` — `mockAiApi`
 - `src/services/paymentApi.ts` — `mockPaymentApi`
 
-Payment is **bypassed entirely** in dev mode (no modal shown).
+Payment uses `x402Fetch` to automatically intercept `402 Payment Required` responses and trigger the connected Algorand wallet via `@txnlab/use-wallet-react`.
 
 ### Backend API Dependencies
 | Agent | Endpoints |
 |---|---|
 | Agent 2 (CV) | `POST /api/workout/start`, `POST /api/workout/frame`, `POST /api/workout/end`, `GET /api/workout/report/:id` |
 | Agent 3 (AI) | `POST /api/ai/guidance`, `POST /api/ai/motivation`, `POST /api/ai/chat`, `POST /api/ai/voice` |
-| Agent 3 (Payment) | `GET /api/payment/status`, `POST /api/payment/session` |
+| Agent 3 (Payment) | `POST /api/payment/session` (402 Protected, handles x402 verification) |
 
 ### Integration Status
 - [x] Agent 2 (CV Backend) — **complete** (`cv-backend-agent` branch)
-- [ ] Agent 3 (AI + x402 Backend) — waiting for implementation
+- [x] Agent 3 (AI + x402 Backend) — **complete** (`ai-x402-agent` branch, real TestNet USDC payment)
 - [x] Frontend mock adapters — complete
 - [x] All pages and components — complete
 

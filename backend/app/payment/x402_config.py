@@ -27,13 +27,13 @@ def load_x402_config() -> X402Config:
     In production, always set X402_RECEIVER_ADDRESS.
     """
     return X402Config(
-        network=os.getenv("X402_NETWORK", "testnet"),
+        network=os.getenv("X402_NETWORK", "algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI="),
         receiver_address=os.getenv("X402_RECEIVER_ADDRESS", ""),
         facilitator_url=os.getenv(
             "X402_FACILITATOR_URL", "https://facilitator.goplausible.xyz"
         ),
-        price=os.getenv("X402_PRICE", "0.1"),
-        asset=os.getenv("X402_ASSET", "ALGO"),
+        price=os.getenv("X402_PRICE", "0.005"),
+        asset=os.getenv("X402_ASSET", "10458941"),
         algorand_node_url=os.getenv(
             "ALGORAND_NODE_URL", "https://testnet-api.algonode.cloud"
         ),
