@@ -12,6 +12,7 @@ numpy>=1.26
 # ─── x402 / Algorand (Agent 3) ───────────────────────────────────────
 # Install with: pip install "x402-avm[flask,avm]"
 x402-avm[flask,avm]
+httpx>=0.27.0
 py-algorand-sdk>=2.7.0
 
 # ─── AI / LLM (Agent 3) ──────────────────────────────────────────────

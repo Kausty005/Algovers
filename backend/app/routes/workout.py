@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 from flask import Blueprint, request, jsonify, Response
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.services import session_service, report_service
 from app.services.exercise_service import list_exercises
@@ -30,6 +31,7 @@ def _error(msg: str, status: int = 400) -> Response:
 # POST /api/workout/start
 # ---------------------------------------------------------------------------
 @workout_bp.post("/start")
+@jwt_required()
 def start_workout() -> Response:
     """
     Start a new workout session.
@@ -51,8 +53,10 @@ def start_workout() -> Response:
             f"Unsupported exercise '{exercise}'. Choose from: {list_exercises()}"
         )
 
+    user_id = get_jwt_identity()
+
     try:
-        session = session_service.create_session(exercise)
+        session = session_service.create_session(exercise, user_id=user_id)
     except Exception as exc:
         logger.exception("Failed to create session")
         return _error(str(exc), 500)
@@ -170,6 +174,7 @@ def end_workout() -> Response:
 # GET /api/workout/report/<session_id>
 # ---------------------------------------------------------------------------
 @workout_bp.get("/report/<session_id>")
+@jwt_required()
 def get_report(session_id: str) -> Response:
     """
     Return the full workout report for a completed session.
@@ -188,3 +193,14 @@ def get_report(session_id: str) -> Response:
 
     report = report_service.build_report(session)
     return jsonify(report.to_dict())
+
+# ---------------------------------------------------------------------------
+# GET /api/workout/dashboard
+# ---------------------------------------------------------------------------
+@workout_bp.get("/dashboard")
+@jwt_required()
+def get_dashboard_stats() -> Response:
+    """Return dashboard stats for the logged-in user."""
+    user_id = get_jwt_identity()
+    stats = session_service.get_user_dashboard_stats(user_id)
+    return jsonify(stats)

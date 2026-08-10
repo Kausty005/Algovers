@@ -1,14 +1,12 @@
-import { apiFetch } from './api';
 import type {
-  PaymentStatusResponse,
-  PaymentSessionRequest,
   PaymentSessionResponse,
   ExerciseType,
+  PaymentStatusResponse,
 } from '../types';
 
 export const paymentApi = {
   createSession: async (exercise: ExerciseType, txId?: string): Promise<PaymentSessionResponse> => {
-    const url = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000'}/api/payment/session`;
+    const url = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/payment/session`;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (txId) {
       headers['X-PAYMENT'] = txId;
@@ -21,10 +19,59 @@ export const paymentApi = {
     });
 
     if (response.status === 402) {
+      const paymentRequiredHeader = response.headers.get('PAYMENT-REQUIRED');
+      if (!paymentRequiredHeader) {
+        throw new Error('Missing PAYMENT-REQUIRED header in 402 response');
+      }
+      
+      const decodedHeader = atob(paymentRequiredHeader);
+      const data = JSON.parse(decodedHeader);
+      const accept = data.accepts[0];
+      
+      // format amount based on decimals
+      let displayAmount = accept.amount;
+      if (accept.extra?.decimals) {
+         const decimals = accept.extra.decimals;
+         displayAmount = (parseInt(accept.amount, 10) / Math.pow(10, decimals)).toString();
+      } else if (accept.asset === '10458941' || accept.asset === '31566704') {
+         // USDC has 6 decimals
+         displayAmount = (parseInt(accept.amount, 10) / 1000000).toString();
+      }
+      return {
+        sessionId: 'pending', // Awaiting verification to get real session ID
+        paymentAddress: accept.payTo,
+        amount: displayAmount,
+        asset: accept.asset,
+        network: accept.network,
+        status: 'required',
+      };
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  buyAiCredits: async (tier: 'basic' | 'pro' | 'expert', sessionId: string, txId?: string): Promise<any> => {
+    const url = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000'}/api/payment/ai-credits/${tier}`;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (txId) {
+      headers['X-PAYMENT'] = txId;
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ sessionId }),
+    });
+
+    if (response.status === 402) {
       const data = await response.json();
       const accept = data.accepts[0];
       return {
-        sessionId: 'pending', // Awaiting verification to get real session ID
         paymentAddress: accept.payTo,
         amount: accept.maxAmountRequired,
         asset: accept.asset,
@@ -59,4 +106,22 @@ export const mockPaymentApi = {
     network: 'algorand-testnet',
     status: 'required',
   }),
+  buyAiCredits: async (tier: 'basic' | 'pro' | 'expert', sessionId: string, txId?: string): Promise<any> => {
+    if (!txId) {
+      return {
+        paymentAddress: 'MOCK_ALGORAND_ADDRESS_00000000000000000000000000',
+        amount: tier === 'basic' ? '0.05' : tier === 'pro' ? '0.1' : '0.25',
+        asset: 'ALGO',
+        network: 'algorand-testnet',
+        status: 'required',
+      };
+    }
+    return {
+      sessionId,
+      credits: 10,
+      model: tier === 'basic' ? 'gemini-1.5-flash-8b' : tier === 'pro' ? 'gemini-1.5-flash' : 'gemini-1.5-pro',
+      tier,
+      status: 'verified'
+    };
+  }
 };

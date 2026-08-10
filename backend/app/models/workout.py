@@ -13,6 +13,7 @@ import uuid
 @dataclass
 class WorkoutSession:
     session_id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str = ""
     exercise: str = ""
     start_time: float = field(default_factory=time.time)
     end_time: Optional[float] = None
@@ -26,6 +27,7 @@ class WorkoutSession:
     def to_dict(self) -> dict:
         return {
             "sessionId": self.session_id,
+            "userId": self.user_id,
             "exercise": self.exercise,
             "startTime": self.start_time,
             "endTime": self.end_time,

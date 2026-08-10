@@ -67,7 +67,7 @@ class AlgorandService:
             payment_address=x402_config.receiver_address or "PLACEHOLDER_SET_X402_RECEIVER_ADDRESS_IN_ENV",
             amount=x402_config.price,
             asset=x402_config.asset,
-            network=f"algorand-{x402_config.network}",
+            network=x402_config.network,
             status="required",
         )
         _sessions[session_id] = session
@@ -99,7 +99,7 @@ class AlgorandService:
             return {
                 "status": "idle",
                 "sessionId": None,
-                "network": f"algorand-{x402_config.network}",
+                "network": x402_config.network,
                 "price": x402_config.price,
                 "asset": x402_config.asset,
                 "receiverAddress": x402_config.receiver_address,

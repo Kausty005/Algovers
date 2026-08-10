@@ -11,6 +11,8 @@ import logging
 from flask import Flask, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
+from flask_jwt_extended import JWTManager
+from .db import init_db
 
 load_dotenv()
 
@@ -24,6 +26,14 @@ logger = logging.getLogger(__name__)
 
 def create_app() -> Flask:
     app = Flask(__name__)
+    
+    app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'super-secret-key-change-in-prod')
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = False # Disable expiration for simplicity or set to timedelta
+    
+    jwt = JWTManager(app)
+    
+    # Initialize DB
+    init_db(app)
 
     # ── CORS ─────────────────────────────────────────────────────────
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
@@ -31,8 +41,8 @@ def create_app() -> Flask:
         app,
         resources={r"/api/*": {"origins": [frontend_url, "http://localhost:5173", "http://localhost:3000"]}},
         supports_credentials=True,
-        allow_headers=["Content-Type", "X-PAYMENT", "Authorization"],
-        expose_headers=["Content-Length", "Content-Type"],
+        allow_headers=["Content-Type", "X-PAYMENT", "PAYMENT-SIGNATURE", "Authorization"],
+        expose_headers=["Content-Length", "Content-Type", "PAYMENT-REQUIRED", "PAYMENT-RESPONSE"],
     )
 
     # ── Agent 3: AI + Payment blueprints ─────────────────────────────
@@ -40,6 +50,9 @@ def create_app() -> Flask:
     from .routes.payment import payment_bp
     app.register_blueprint(ai_bp)
     app.register_blueprint(payment_bp)
+
+    from .routes.auth import auth_bp
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
 
     # ── Agent 2: CV + Workout blueprint ──────────────────────────────
     from .routes.workout import workout_bp
