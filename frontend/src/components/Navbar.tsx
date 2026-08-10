@@ -1,5 +1,6 @@
-import { Link, useLocation } from 'react-router-dom';
-import { Dumbbell, LayoutDashboard, MessageSquare } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Dumbbell, LayoutDashboard, MessageSquare, LogOut, User } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -9,6 +10,13 @@ const navItems = [
 
 export function Navbar() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
 
   return (
     <nav
@@ -58,7 +66,7 @@ export function Navbar() {
 
       {/* Nav links */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        {navItems.map(({ to, label, icon: Icon }) => {
+        {user && navItems.map(({ to, label, icon: Icon }) => {
           const isActive = pathname.startsWith(to);
           return (
             <Link
@@ -81,6 +89,24 @@ export function Navbar() {
             </Link>
           );
         })}
+        
+        {user ? (
+          <div style={{ display: 'flex', alignItems: 'center', marginLeft: '16px', gap: '12px' }}>
+            <div className="neu-inset" style={{ padding: '6px 12px', borderRadius: '20px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: 600 }}>
+              <User size={16} color="var(--accent)" />
+              {user.name}
+            </div>
+            <button onClick={handleLogout} className="neu-btn" style={{ padding: '8px', borderRadius: '50%' }} title="Logout">
+              <LogOut size={18} color="var(--danger)" />
+            </button>
+          </div>
+        ) : (
+          <Link to="/auth" style={{ textDecoration: 'none' }}>
+            <button className="neu-btn-accent neu-btn" style={{ padding: '8px 24px', fontSize: '0.9rem' }}>
+              Sign In
+            </button>
+          </Link>
+        )}
       </div>
     </nav>
   );

@@ -42,6 +42,8 @@ export const aiApi = {
 };
 
 // ─── MOCK (DEV ONLY) ─────────────────────────────────────────────
+let mockCredits = 0;
+
 export const mockAiApi = {
   guidance: async (): Promise<GuidanceResponse> => ({
     text: 'Keep your back straight and core engaged.',
@@ -50,8 +52,16 @@ export const mockAiApi = {
   motivation: async (): Promise<MotivationResponse> => ({
     text: "You're doing great! Keep it up!",
   }),
-  chat: async (req: ChatRequest): Promise<ChatResponse> => ({
-    response: `[MOCK] You asked: "${req.message}". Focus on form and consistency!`,
-  }),
+  chat: async (req: ChatRequest): Promise<ChatResponse> => {
+    if (mockCredits <= 0) {
+       throw new Error(JSON.stringify({ error: "Insufficient credits", code: "NO_CREDITS" }));
+    }
+    mockCredits--;
+    return {
+      response: `[MOCK] You asked: "${req.message}". Focus on form and consistency!`,
+      creditsRemaining: mockCredits,
+    };
+  },
   voice: async (): Promise<string> => '',
+  _setMockCredits: (c: number) => { mockCredits = c; }
 };

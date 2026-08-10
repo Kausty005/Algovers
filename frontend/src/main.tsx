@@ -5,6 +5,8 @@ import { WalletManager, WalletId, NetworkId } from '@txnlab/use-wallet'
 import './index.css'
 import App from './App.tsx'
 
+import { AuthProvider } from './context/AuthContext'
+
 const walletManager = new WalletManager({
   wallets: [WalletId.PERA, WalletId.DEFLY, WalletId.LUTE],
   defaultNetwork: NetworkId.TESTNET
@@ -12,8 +14,10 @@ const walletManager = new WalletManager({
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <WalletProvider manager={walletManager}>
-      <App />
-    </WalletProvider>
+    <AuthProvider>
+      <WalletProvider manager={walletManager}>
+        <App />
+      </WalletProvider>
+    </AuthProvider>
   </StrictMode>,
 )
