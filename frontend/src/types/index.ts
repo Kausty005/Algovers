@@ -100,6 +100,7 @@ export interface PaymentSessionResponse {
   asset: string;
   network: string;
   status: PaymentStatus;
+  txId?: string; // Optional: returned by the server after payment verification
 }
 
 // ─── API State ───────────────────────────────────────────────────
