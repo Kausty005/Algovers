@@ -19,26 +19,32 @@ export const paymentApi = {
     });
 
     if (response.status === 402) {
+      // Try header-based x402 format first (real x402-avm middleware), then fall back to JSON body (demo middleware)
       const paymentRequiredHeader = response.headers.get('PAYMENT-REQUIRED');
-      if (!paymentRequiredHeader) {
-        throw new Error('Missing PAYMENT-REQUIRED header in 402 response');
+      let data: any;
+      if (paymentRequiredHeader) {
+        data = JSON.parse(atob(paymentRequiredHeader));
+      } else {
+        data = await response.json();
       }
-      
-      const decodedHeader = atob(paymentRequiredHeader);
-      const data = JSON.parse(decodedHeader);
-      const accept = data.accepts[0];
-      
-      // format amount based on decimals
-      let displayAmount = accept.amount;
+
+      const accept = data.accepts?.[0];
+      if (!accept) throw new Error('Invalid 402 response: no payment options found');
+
+      // Normalise field names — real x402 uses `amount`, demo uses `maxAmountRequired`
+      const rawAmount: string = accept.amount ?? accept.maxAmountRequired ?? '0';
+
+      // Format amount based on decimals
+      let displayAmount = rawAmount;
       if (accept.extra?.decimals) {
-         const decimals = accept.extra.decimals;
-         displayAmount = (parseInt(accept.amount, 10) / Math.pow(10, decimals)).toString();
+        displayAmount = (parseInt(rawAmount, 10) / Math.pow(10, accept.extra.decimals)).toString();
       } else if (accept.asset === '10458941' || accept.asset === '31566704') {
-         // USDC has 6 decimals
-         displayAmount = (parseInt(accept.amount, 10) / 1000000).toString();
+        // USDC / TestNet USDC — 6 decimals
+        displayAmount = (parseInt(rawAmount, 10) / 1_000_000).toString();
       }
+
       return {
-        sessionId: 'pending', // Awaiting verification to get real session ID
+        sessionId: 'pending',
         paymentAddress: accept.payTo,
         amount: displayAmount,
         asset: accept.asset,

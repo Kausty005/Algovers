@@ -39,6 +39,17 @@ def apply_x402_middleware(app: Flask) -> None:
 
     This must be called AFTER all routes are registered on *app*.
     """
+    # ── Dev bypass ──────────────────────────────────────────────────
+    import os
+    if os.getenv("BYPASS_PAYMENT", "false").lower() in ("1", "true", "yes"):
+        logger.warning(
+            "BYPASS_PAYMENT=true — payment checks are DISABLED. "
+            "All requests pass through without payment. "
+            "Set BYPASS_PAYMENT=false for production."
+        )
+        _apply_passthrough_middleware(app)
+        return
+
     if not x402_config.receiver_address:
         logger.warning(
             "X402_RECEIVER_ADDRESS is not set. "
@@ -75,7 +86,7 @@ def _apply_x402_avm_middleware(app: Flask) -> None:
     server = x402ResourceServerSync(facilitator)
 
     from x402.mechanisms.avm.exact import ExactAvmServerScheme  # type: ignore
-    server.register("algorand:*", ExactAvmServerScheme())
+    server.register(x402_config.network, ExactAvmServerScheme())
 
     routes = {
         f"{PROTECTED_METHOD} {PROTECTED_SESSION_PATH}": RouteConfig(
@@ -110,11 +121,35 @@ def _apply_x402_avm_middleware(app: Flask) -> None:
             description=f"{info['desc']} — {info['price']} {x402_config.asset}",
         )
 
-    app.wsgi_app = payment_middleware(app.wsgi_app, routes=routes, server=server)  # type: ignore
+    payment_middleware(app, routes=routes, server=server)  # type: ignore
     logger.info(
         "x402-avm middleware applied to %s and AI credit routes",
         PROTECTED_SESSION_PATH
     )
+
+
+def _apply_passthrough_middleware(app: Flask) -> None:
+    """Bypass all payment checks — pass every request through as-if paid.
+
+    DEVELOPMENT ONLY. Never use this in production.
+    """
+    original_wsgi = app.wsgi_app
+
+    def passthrough_middleware(environ, start_response):
+        path = environ.get("PATH_INFO", "")
+        method = environ.get("REQUEST_METHOD", "")
+
+        # For the protected session endpoint, inject a fake X-PAYMENT header
+        # so the Flask route handler (which checks jwt) still works normally.
+        if method == PROTECTED_METHOD and (
+            path == PROTECTED_SESSION_PATH or path in PROTECTED_AI_PATHS
+        ):
+            environ["HTTP_X_PAYMENT"] = "bypass-dev"
+
+        return original_wsgi(environ, start_response)
+
+    app.wsgi_app = passthrough_middleware  # type: ignore
+    logger.info("Payment BYPASS middleware applied (BYPASS_PAYMENT=true)")
 
 
 def _apply_demo_middleware(app: Flask) -> None:
@@ -133,7 +168,7 @@ def _apply_demo_middleware(app: Flask) -> None:
         method = environ.get("REQUEST_METHOD", "")
 
         if method == PROTECTED_METHOD and (path == PROTECTED_SESSION_PATH or path in PROTECTED_AI_PATHS):
-            x_payment = environ.get("HTTP_X_PAYMENT", "")
+            x_payment = environ.get("HTTP_X_PAYMENT", "") or environ.get("HTTP_PAYMENT_SIGNATURE", "")
 
             if not x_payment:
                 # Determine price and desc
@@ -142,6 +177,20 @@ def _apply_demo_middleware(app: Flask) -> None:
                 if path in PROTECTED_AI_PATHS:
                     price = PROTECTED_AI_PATHS[path]["price"]
                     desc = PROTECTED_AI_PATHS[path]["desc"]
+
+                # Convert decimal price to integer micro-units for ExactAvmScheme
+                # USDC (10458941 / 31566704) = 6 decimals, ALGO = 6 decimals
+                ASSET_DECIMALS = {
+                    "10458941": 6,   # TestNet USDC
+                    "31566704": 6,   # MainNet USDC
+                    "ALGO": 6,       # ALGO uses microALGO
+                }
+                asset_key = x402_config.asset
+                decimals = ASSET_DECIMALS.get(asset_key, 6)
+                try:
+                    micro_amount = str(int(round(float(price) * (10 ** decimals))))
+                except (ValueError, TypeError):
+                    micro_amount = price  # fallback: send as-is
 
                 # Return 402 Payment Required
                 import json
@@ -152,12 +201,14 @@ def _apply_demo_middleware(app: Flask) -> None:
                         {
                             "scheme": "exact",
                             "network": x402_config.network,
-                            "payTo": x402_config.receiver_address or "SET_X402_RECEIVER_ADDRESS",
-                            "maxAmountRequired": price,
+                            "payTo": x402_config.receiver_address or "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+                            "amount": micro_amount,
                             "asset": x402_config.asset,
                             "extra": {
                                 "description": desc,
+                                "name": desc,
                                 "facilitator": x402_config.facilitator_url,
+                                "decimals": decimals,
                             },
                         }
                     ],
