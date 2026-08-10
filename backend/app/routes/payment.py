@@ -44,8 +44,20 @@ def payment_status():
 
 # ---------------------------------------------------------------------------
 # POST /api/payment/session
-# (x402 middleware intercepts this BEFORE it reaches here)
+# GET /api/payment/check
+# (x402 middleware intercepts these BEFORE they reach here)
 # ---------------------------------------------------------------------------
+
+@payment_bp.route("/check", methods=["GET"])
+@jwt_required()
+def payment_check():
+    """Verify payment status for the Workout session.
+    
+    Returns 200 OK if payment is valid/provided.
+    Returns 402 via middleware if payment is required.
+    """
+    return jsonify({"status": "verified"}), 200
+
 
 @payment_bp.route("/session", methods=["POST"])
 @jwt_required()

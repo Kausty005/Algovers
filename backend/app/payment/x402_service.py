@@ -94,13 +94,28 @@ def _apply_x402_avm_middleware(app: Flask) -> None:
                 PaymentOption(
                     scheme="exact",
                     pay_to=x402_config.receiver_address,
-                    price=f"${x402_config.price}",
+                    price=str(x402_config.price),
                     network=x402_config.network,
                 )
             ],
             mime_type="application/json",
             description=(
                 f"Gym Buddy workout session — {x402_config.price} "
+                f"{x402_config.asset} on Algorand {x402_config.network}"
+            ),
+        ),
+        f"GET /api/payment/check": RouteConfig(
+            accepts=[
+                PaymentOption(
+                    scheme="exact",
+                    pay_to=x402_config.receiver_address,
+                    price=str(x402_config.price),
+                    network=x402_config.network,
+                )
+            ],
+            mime_type="application/json",
+            description=(
+                f"Gym Buddy workout session access — {x402_config.price} "
                 f"{x402_config.asset} on Algorand {x402_config.network}"
             ),
         )
@@ -113,7 +128,7 @@ def _apply_x402_avm_middleware(app: Flask) -> None:
                 PaymentOption(
                     scheme="exact",
                     pay_to=x402_config.receiver_address,
-                    price=f"${info['price']}",
+                    price=str(info['price']),
                     network=x402_config.network,
                 )
             ],

@@ -1,14 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Square, CreditCard, AlertCircle } from 'lucide-react';
+import { Square, AlertCircle } from 'lucide-react';
 import { WorkoutCamera } from '../components/WorkoutCamera';
 import { RepCounter } from '../components/RepCounter';
 import { WorkoutTimer } from '../components/WorkoutTimer';
 import { GuidancePanel } from '../components/GuidancePanel';
 import { VoiceIndicator } from '../components/VoiceIndicator';
-import { PaymentModal } from '../components/PaymentModal';
 import { useWorkoutSession } from '../hooks/useWorkoutSession';
-import { usePayment } from '../hooks/usePayment';
 import { aiApi } from '../services/aiApi';
 import type { ExerciseType, GuidanceResponse } from '../types';
 
@@ -23,10 +21,8 @@ export function WorkoutPage() {
   const navigate = useNavigate();
   const exerciseType = (exercise as ExerciseType) ?? 'squat';
 
-  // ── Payment ──────────────────────────────────────────────────
-  const { status: payStatus, session: paySession, error: payError, initPayment, confirmPayment, setError: setPayError } = usePayment();
-  const [paymentOpen, setPaymentOpen] = useState(false);
-  const [sessionUnlocked, setSessionUnlocked] = useState(false); // require payment
+  // ── Payment handled in ExercisePage — session is pre-unlocked ────────
+  const [sessionUnlocked] = useState(true); // always unlocked when we arrive here
 
   // ── Workout session ───────────────────────────────────────────
   const { session, frameResult, elapsed, loading, error: sessionError, startSession, sendFrame, endSession } = useWorkoutSession();
@@ -42,29 +38,13 @@ export function WorkoutPage() {
   const [muted, setMuted] = useState(false);
   const [audioUrl, setAudioUrl] = useState<string | undefined>();
 
-  // ── Initialize: show payment modal ───────────────────────────
+  // ── Start workout immediately ────────────────────────────────
   useEffect(() => {
-    if (!sessionUnlocked) {
-      initPayment(exerciseType);
-      setPaymentOpen(true);
-    }
-  }, [sessionUnlocked, exerciseType, initPayment]);
-
-  // ── When payment verified, unlock session ────────────────────
-  useEffect(() => {
-    if (payStatus === 'verified') {
-      setSessionUnlocked(true);
-      setPaymentOpen(false);
-    }
-  }, [payStatus]);
-
-  // ── Start workout when unlocked ───────────────────────────────
-  useEffect(() => {
-    if (sessionUnlocked && !workoutStarted) {
+    if (!workoutStarted) {
       setWorkoutStarted(true);
       startSession(exerciseType);
     }
-  }, [sessionUnlocked, workoutStarted, exerciseType, startSession]);
+  }, [workoutStarted, exerciseType, startSession]);
 
   // ── Fetch AI guidance on rep complete or form change ─────────
   const fetchGuidance = useCallback(async () => {
@@ -117,27 +97,8 @@ export function WorkoutPage() {
     }
   };
 
-  const handlePaymentConfirm = () => {
-    confirmPayment();
-  };
-
   return (
     <div className="page-layout">
-      {/* Payment modal */}
-      <PaymentModal
-        open={paymentOpen}
-        status={payStatus}
-        session={paySession}
-        error={payError}
-        setError={setPayError}
-        onClose={() => {
-          if (payStatus !== 'verified') {
-            navigate('/exercise');
-          }
-          setPaymentOpen(false);
-        }}
-        onConfirmPayment={handlePaymentConfirm}
-      />
 
       <div
         className="container"
@@ -259,17 +220,6 @@ export function WorkoutPage() {
             audioUrl={audioUrl}
           />
 
-          {/* Payment button if not unlocked */}
-          {!sessionUnlocked && (
-            <button
-              className="neu-btn-accent neu-btn"
-              style={{ padding: '14px', width: '100%' }}
-              onClick={() => setPaymentOpen(true)}
-            >
-              <CreditCard size={18} />
-              Pay to Unlock Session
-            </button>
-          )}
         </div>
       </div>
 

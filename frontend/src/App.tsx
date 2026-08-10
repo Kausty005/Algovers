@@ -3,6 +3,7 @@ import { Navbar } from './components/Navbar';
 import { LandingPage } from './pages/LandingPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ExercisePage } from './pages/ExercisePage';
+import { PaymentGate } from './components/PaymentGate';
 import { WorkoutPage } from './pages/WorkoutPage';
 import { ChatPage } from './pages/ChatPage';
 import { ReportPage } from './pages/ReportPage';
@@ -25,7 +26,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-        <Route path="/exercise" element={<ProtectedRoute><ExercisePage /></ProtectedRoute>} />
+        <Route path="/exercise" element={<ProtectedRoute><PaymentGate><ExercisePage /></PaymentGate></ProtectedRoute>} />
         <Route path="/workout/:exercise" element={<ProtectedRoute><WorkoutPage /></ProtectedRoute>} />
         <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
         <Route path="/report/:sessionId" element={<ProtectedRoute><ReportPage /></ProtectedRoute>} />

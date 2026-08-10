@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { ExerciseSelector } from '../components/ExerciseSelector';
@@ -8,11 +8,11 @@ export function ExercisePage() {
   const [selected, setSelected] = useState<ExerciseType | null>(null);
   const navigate = useNavigate();
 
-  const handleStart = () => {
-    if (selected) {
-      navigate(`/workout/${selected}`);
-    }
-  };
+  // Since payment is gated by PaymentGate, we can navigate directly
+  const handleStart = useCallback(() => {
+    if (!selected) return;
+    navigate(`/workout/${selected}`);
+  }, [selected, navigate]);
 
   return (
     <div className="page-layout">
