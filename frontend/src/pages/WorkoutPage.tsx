@@ -9,7 +9,7 @@ import { VoiceIndicator } from '../components/VoiceIndicator';
 import { PaymentModal } from '../components/PaymentModal';
 import { useWorkoutSession } from '../hooks/useWorkoutSession';
 import { usePayment } from '../hooks/usePayment';
-import { aiApi, mockAiApi } from '../services/aiApi';
+import { aiApi } from '../services/aiApi';
 import type { ExerciseType, GuidanceResponse } from '../types';
 
 const isDev = import.meta.env.DEV;
@@ -24,7 +24,7 @@ export function WorkoutPage() {
   const exerciseType = (exercise as ExerciseType) ?? 'squat';
 
   // ── Payment ──────────────────────────────────────────────────
-  const { status: payStatus, session: paySession, error: payError, initPayment, confirmPayment } = usePayment();
+  const { status: payStatus, session: paySession, error: payError, initPayment, confirmPayment, setError: setPayError } = usePayment();
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [sessionUnlocked, setSessionUnlocked] = useState(false); // require payment
 
@@ -129,6 +129,7 @@ export function WorkoutPage() {
         status={payStatus}
         session={paySession}
         error={payError}
+        setError={setPayError}
         onClose={() => {
           if (payStatus !== 'verified') {
             navigate('/exercise');

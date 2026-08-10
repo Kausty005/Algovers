@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useWallet } from '@txnlab/use-wallet-react';
-import { x402Client } from '@x402/core';
+import { x402Client } from '@x402/core/client';
 import { wrapFetchWithPayment } from '@x402/fetch';
-import { ExactAvmClient } from '@x402/avm';
+import { ExactAvmScheme } from '@x402/avm';
 import type { PaymentStatus, PaymentSessionResponse, ExerciseType } from '../types';
 import { paymentApi } from '../services/paymentApi';
 
@@ -46,11 +46,11 @@ export function usePayment() {
         }
       };
 
-      const client = new x402Client().register('algorand:*', new ExactAvmClient(signer));
+      const client = new x402Client().register('algorand:*', new ExactAvmScheme(signer));
       const fetchWithPayment = wrapFetchWithPayment(window.fetch, client);
 
       // 2. Retry the request with the payment wrapper
-      const url = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000'}/api/payment/session`;
+      const url = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/payment/session`;
       const response = await fetchWithPayment(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -65,10 +65,20 @@ export function usePayment() {
       setSession(data);
       setStatus('verified');
 
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
       setStatus('failed');
-      setError('Payment verification or settlement failed. Please try again.');
+      
+      const errMsg = err?.message || String(err);
+      if (errMsg.includes('rejected')) {
+         setError('Transaction rejected by user.');
+      } else if (errMsg.includes('Insufficient funds') || errMsg.includes('below minimum')) {
+         setError('Insufficient ALGO balance for transaction fees.');
+      } else if (errMsg.includes('asset') && errMsg.includes('balance')) {
+         setError('Insufficient USDC balance to complete payment.');
+      } else {
+         setError('Payment verification or settlement failed. Please try again.');
+      }
     }
   }, [activeAccount, currentExercise, signTransactions]);
 
@@ -78,5 +88,5 @@ export function usePayment() {
     setError(null);
   }, []);
 
-  return { status, session, error, initPayment, confirmPayment, reset };
+  return { status, session, error, setError, initPayment, confirmPayment, reset };
 }

@@ -10,7 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@blockshake/defly-connect": "^1.2.1",
     "@mediapipe/tasks-vision": "^1.0.1",
+    "@perawallet/connect": "^1.6.0",
     "@txnlab/use-wallet": "^4.6.0",
     "@txnlab/use-wallet-react": "^4.6.0",
     "@x402/avm": "^2.21.0",
@@ -18,6 +20,7 @@
     "@x402/fetch": "^2.21.0",
     "algosdk": "^3.6.0",
     "lucide-react": "^1.30.0",
+    "lute-connect": "^1.7.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2"

@@ -15,6 +15,7 @@ interface Props {
   status: PaymentStatus;
   session: PaymentSessionResponse | null;
   error: string | null;
+  setError: (msg: string) => void;
   onClose: () => void;
   onConfirmPayment: () => void;
 }
@@ -36,9 +37,9 @@ function statusLabel(s: PaymentStatus) {
   }
 }
 
-export function PaymentModal({ open, status, session, error, onClose, onConfirmPayment }: Props) {
+export function PaymentModal({ open, status, session, error, setError, onClose, onConfirmPayment }: Props) {
   const [copied, setCopied] = useState(false);
-  const { activeAccount, providers } = useWallet();
+  const { activeAccount, wallets } = useWallet();
 
   if (!open) return null;
 
@@ -51,7 +52,7 @@ export function PaymentModal({ open, status, session, error, onClose, onConfirmP
   };
 
   const getNetworkName = (network: string) => {
-    if (network === 'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDe' || network === 'testnet') return 'Algorand TestNet';
+    if (network.includes('SGO1GKSzyE') || network === 'testnet') return 'Algorand TestNet';
     return network;
   }
 
@@ -82,6 +83,8 @@ export function PaymentModal({ open, status, session, error, onClose, onConfirmP
         style={{
           width: '100%',
           maxWidth: '460px',
+          maxHeight: '90vh',
+          overflowY: 'auto',
           padding: '36px',
           display: 'flex',
           flexDirection: 'column',
@@ -136,8 +139,8 @@ export function PaymentModal({ open, status, session, error, onClose, onConfirmP
                   borderRadius: '10px',
                 }}
               >
-                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 500 }}>{label}</span>
-                <span style={{ color: 'var(--text-primary)', fontSize: '0.875rem', fontWeight: 700 }}>{value}</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', fontWeight: 500, minWidth: '60px' }}>{label}</span>
+                <span style={{ color: 'var(--text-primary)', fontSize: '0.875rem', fontWeight: 700, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>{value}</span>
               </div>
             ))}
 
@@ -197,28 +200,62 @@ export function PaymentModal({ open, status, session, error, onClose, onConfirmP
           {status === 'required' && !activeAccount && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <p style={{ textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Connect Wallet to Pay</p>
-              {providers?.map((provider) => (
-                <button
-                  key={provider.metadata.id}
-                  className="neu-btn"
-                  style={{ padding: '12px 24px', fontSize: '0.95rem', width: '100%' }}
-                  onClick={() => provider.connect()}
-                >
-                  Connect {provider.metadata.name}
-                </button>
-              ))}
+              {wallets?.map((wallet: any) => {
+                const walletName = wallet.metadata?.name || wallet.name || wallet.id;
+                return (
+                  <button
+                    key={wallet.id}
+                    className="neu-btn"
+                    style={{ padding: '12px 24px', fontSize: '0.95rem', width: '100%' }}
+                    onClick={() => {
+                      console.log('--- WALLET CONNECT DIAGNOSTICS ---');
+                      console.log('wallet.id:', wallet.id);
+                      console.log('wallet.metadata:', wallet.metadata);
+                      console.log('wallet.isReady:', wallet.isReady);
+                      console.log('wallet.isConnected:', wallet.isConnected);
+                      console.log('----------------------------------');
+                      wallet.connect().catch((err: any) => {
+                        console.error('--- WALLET CONNECT ERROR DIAGNOSTICS ---');
+                        console.error('Complete error object:', err);
+                        console.error('error.name:', err?.name);
+                        console.error('error.message:', err?.message);
+                        console.error('error.stack:', err?.stack);
+                        console.error('----------------------------------------');
+                        
+                        const msg = err?.message?.toLowerCase() || String(err).toLowerCase();
+                        if (msg.includes('not found') || msg.includes('not installed') || msg.includes('not available') || msg.includes('not defined')) {
+                          setError(`${walletName} not detected. Please install it.`);
+                        } else {
+                          setError(`Connection to ${walletName} failed or was rejected.`);
+                        }
+                      });
+                    }}
+                  >
+                    Connect {walletName}
+                  </button>
+                );
+              })}
             </div>
           )}
 
           {status === 'required' && activeAccount && (
-            <button
-              className="neu-btn-accent neu-btn"
-              style={{ padding: '14px 24px', fontSize: '1rem', width: '100%' }}
-              onClick={onConfirmPayment}
-            >
-              <Wallet size={20} />
-              Pay with Algorand
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ color: 'var(--success)', fontWeight: 600, marginBottom: '4px' }}>Wallet Connected</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Address:</div>
+                <div style={{ fontFamily: 'monospace', color: 'var(--text-primary)', fontSize: '0.8rem', background: 'var(--bg-secondary)', padding: '6px', borderRadius: '6px', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {activeAccount.address}
+                </div>
+              </div>
+              <button
+                className="neu-btn-accent neu-btn"
+                style={{ padding: '14px 24px', fontSize: '1rem', width: '100%' }}
+                onClick={onConfirmPayment}
+              >
+                <Wallet size={20} />
+                Pay {session?.amount} {getAssetName(session?.asset || '')}
+              </button>
+            </div>
           )}
 
           {status !== 'verified' && (

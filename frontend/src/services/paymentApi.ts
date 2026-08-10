@@ -1,14 +1,12 @@
-import { apiFetch } from './api';
 import type {
-  PaymentStatusResponse,
-  PaymentSessionRequest,
   PaymentSessionResponse,
   ExerciseType,
+  PaymentStatusResponse,
 } from '../types';
 
 export const paymentApi = {
   createSession: async (exercise: ExerciseType, txId?: string): Promise<PaymentSessionResponse> => {
-    const url = `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000'}/api/payment/session`;
+    const url = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/payment/session`;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (txId) {
       headers['X-PAYMENT'] = txId;
@@ -21,12 +19,28 @@ export const paymentApi = {
     });
 
     if (response.status === 402) {
-      const data = await response.json();
+      const paymentRequiredHeader = response.headers.get('PAYMENT-REQUIRED');
+      if (!paymentRequiredHeader) {
+        throw new Error('Missing PAYMENT-REQUIRED header in 402 response');
+      }
+      
+      const decodedHeader = atob(paymentRequiredHeader);
+      const data = JSON.parse(decodedHeader);
       const accept = data.accepts[0];
+      
+      // format amount based on decimals
+      let displayAmount = accept.amount;
+      if (accept.extra?.decimals) {
+         const decimals = accept.extra.decimals;
+         displayAmount = (parseInt(accept.amount, 10) / Math.pow(10, decimals)).toString();
+      } else if (accept.asset === '10458941' || accept.asset === '31566704') {
+         // USDC has 6 decimals
+         displayAmount = (parseInt(accept.amount, 10) / 1000000).toString();
+      }
       return {
         sessionId: 'pending', // Awaiting verification to get real session ID
         paymentAddress: accept.payTo,
-        amount: accept.maxAmountRequired,
+        amount: displayAmount,
         asset: accept.asset,
         network: accept.network,
         status: 'required',

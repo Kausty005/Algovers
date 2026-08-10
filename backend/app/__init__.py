@@ -31,8 +31,8 @@ def create_app() -> Flask:
         app,
         resources={r"/api/*": {"origins": [frontend_url, "http://localhost:5173", "http://localhost:3000"]}},
         supports_credentials=True,
-        allow_headers=["Content-Type", "X-PAYMENT", "Authorization"],
-        expose_headers=["Content-Length", "Content-Type"],
+        allow_headers=["Content-Type", "X-PAYMENT", "PAYMENT-SIGNATURE", "Authorization"],
+        expose_headers=["Content-Length", "Content-Type", "PAYMENT-REQUIRED", "PAYMENT-RESPONSE"],
     )
 
     # ── Agent 3: AI + Payment blueprints ─────────────────────────────
