@@ -11,15 +11,15 @@
   --neu-shadow-light: #ffffff;
   --neu-shadow-dark: #a3b1c6;
 
-  /* Accent — Gym Orange (fire / iron / intensity) */
-  --accent: #ff5e1a;
-  --accent-hover: #e04b0e;
-  --accent-glow: rgba(255, 94, 26, 0.35);
+  /* Accent — Torch Red */
+  --accent: #ff0033;
+  --accent-hover: #d9002b;
+  --accent-glow: rgba(255, 0, 51, 0.35);
 
   /* Text */
   --text-primary: #2d3748;
   --text-secondary: #718096;
-  --text-accent: #ff5e1a;
+  --text-accent: #ff0033;
 
   /* Status */
   --success: #48bb78;

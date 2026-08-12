@@ -15,7 +15,7 @@ os.environ.setdefault("GEMINI_API_KEY", "")
 os.environ.setdefault("X402_RECEIVER_ADDRESS", "")
 os.environ.setdefault("X402_NETWORK", "testnet")
 os.environ.setdefault("X402_PRICE", "0.1")
-os.environ.setdefault("X402_ASSET", "ALGO")
+os.environ.setdefault("X402_ASSET", "10458941")
 
 
 @pytest.fixture
@@ -127,7 +127,7 @@ class TestPaymentSession:
         data = resp.get_json()
         assert "amount" in data
         assert "asset" in data
-        assert data["asset"] == "ALGO"
+        assert data["asset"] == "10458941"
 
     def test_paid_response_has_network(self, client):
         resp = client.post(

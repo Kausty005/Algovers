@@ -105,6 +105,7 @@ def payment_session():
         "asset": session.asset,
         "network": session.network,
         "status": "verified",
+        "transactionId": x_payment or "",
     }), 200
 
 
@@ -184,5 +185,6 @@ def payment_ai_credits(tier: str):
         "credits": session_data["credits"],
         "model": session_data["model_name"],
         "tier": session_data["tier"],
-        "status": "verified"
+        "status": "verified",
+        "transactionId": request.headers.get("X-PAYMENT", "")
     }), 200
