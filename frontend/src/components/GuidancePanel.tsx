@@ -5,6 +5,7 @@ interface Props {
   priority?: 'low' | 'medium' | 'high';
   loading?: boolean;
   locked?: boolean;
+  skipped?: boolean;
   agentPurchased?: boolean;
 }
 
@@ -14,7 +15,7 @@ const PRIORITY_CONFIG = {
   high: { icon: AlertTriangle, color: 'var(--warning)', label: 'Fix' },
 };
 
-export function GuidancePanel({ message, priority = 'medium', loading, locked, agentPurchased }: Props) {
+export function GuidancePanel({ message, priority = 'medium', loading, locked, skipped, agentPurchased }: Props) {
   if (locked) {
     return (
       <div className="neu-panel" style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
@@ -22,7 +23,9 @@ export function GuidancePanel({ message, priority = 'medium', loading, locked, a
           <div className="neu-icon-wrapper" style={{ padding: '16px', borderRadius: '50%' }}>
             <Lock size={32} color="var(--text-secondary)" />
           </div>
-          <p style={{ color: 'var(--text-secondary)', fontWeight: 600, margin: 0 }}>Agent will unlock if needed</p>
+          <p style={{ color: 'var(--text-secondary)', fontWeight: 600, margin: 0 }}>
+            {skipped ? 'Agentic Features Disabled' : 'Agent will unlock if needed'}
+          </p>
         </div>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', opacity: 0.3 }}>
@@ -32,7 +35,7 @@ export function GuidancePanel({ message, priority = 'medium', loading, locked, a
           <h3 className="neu-heading" style={{ fontSize: '1.25rem', margin: 0 }}>Live AI Coach</h3>
         </div>
         <div className="neu-inset" style={{ flex: 1, borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.3 }}>
-          <p style={{ color: 'var(--text-secondary)' }}>Guidance Locked</p>
+          <p style={{ color: 'var(--text-secondary)' }}>{skipped ? 'Agent Disabled' : 'Guidance Locked'}</p>
         </div>
       </div>
     );

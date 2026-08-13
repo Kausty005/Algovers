@@ -18,6 +18,8 @@ const isDev = import.meta.env.DEV;
 export function WorkoutPage() {
   const { exercise } = useParams<{ exercise: string }>();
   const navigate = useNavigate();
+  const searchParams = new URLSearchParams(window.location.search);
+  const skipAgent = searchParams.get('skipAgent') === 'true';
   const exerciseType = (exercise as ExerciseType) ?? 'squat';
 
   // ── Payment handled in ExercisePage — session is pre-unlocked ────────
@@ -40,7 +42,7 @@ export function WorkoutPage() {
   const [simulateBadForm, setSimulateBadForm] = useState(false);
   const [isAgentPurchasing, setIsAgentPurchasing] = useState(false);
   const [purchasingService, setPurchasingService] = useState('');
-  const [guidanceDisabled, setGuidanceDisabled] = useState(false);
+  const [guidanceDisabled, setGuidanceDisabled] = useState(skipAgent);
 
   // ── Start workout immediately ────────────────────────────────
   useEffect(() => {
@@ -269,7 +271,8 @@ export function WorkoutPage() {
           <GuidancePanel
             message={guidanceDisabled ? 'Guidance Disabled' : (guidanceText || (isTextGuidanceUnlocked() ? 'Analyzing your form…' : 'Agent monitoring...'))}
             priority={guidancePriority}
-            locked={!isTextGuidanceUnlocked()}
+            locked={guidanceDisabled && !isTextGuidanceUnlocked()}
+            skipped={skipAgent}
             agentPurchased={isTextGuidanceUnlocked()}
           />
 

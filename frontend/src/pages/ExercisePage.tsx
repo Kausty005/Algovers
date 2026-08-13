@@ -20,11 +20,17 @@ export function ExercisePage() {
     navigate(`/workout/${selected}`);
   }, [selected, navigate]);
 
+  const handleSkip = useCallback(() => {
+    setShowModal(false);
+    navigate(`/workout/${selected}?skipAgent=true`);
+  }, [selected, navigate]);
+
   return (
     <div className="page-layout">
       {showModal && (
         <SpendingLimitModal 
           onFunded={handleFunded} 
+          onSkip={handleSkip}
           onCancel={() => setShowModal(false)} 
         />
       )}

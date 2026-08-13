@@ -6,10 +6,11 @@ import { createSessionWallet, getSessionAccount, markSessionWalletFunded } from 
 
 interface Props {
   onFunded: () => void;
+  onSkip: () => void;
   onCancel: () => void;
 }
 
-export function SpendingLimitModal({ onFunded, onCancel }: Props) {
+export function SpendingLimitModal({ onFunded, onSkip, onCancel }: Props) {
   const { activeAccount, signTransactions } = useWallet();
   const activeAddress = activeAccount?.address;
   const [limit, setLimit] = useState(0.10);
@@ -121,9 +122,34 @@ export function SpendingLimitModal({ onFunded, onCancel }: Props) {
   }, [activeAddress, limit, onFunded]);
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal-content animate-fade-up">
-        <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 200,
+        background: 'rgba(160,177,198,0.55)',
+        backdropFilter: 'blur(6px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '24px',
+      }}
+      className="animate-fade-in"
+    >
+      <div
+        className="neu-raised-lg animate-fade-up"
+        style={{
+          width: '100%',
+          maxWidth: '460px',
+          padding: '36px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '24px',
+          animationDelay: '0.05s',
+          animationFillMode: 'both',
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
           <div className="neu-icon-wrapper" style={{ margin: '0 auto 16px auto', width: '64px', height: '64px' }}>
             <Zap size={32} color="var(--accent)" />
           </div>
@@ -136,7 +162,7 @@ export function SpendingLimitModal({ onFunded, onCancel }: Props) {
           </p>
         </div>
 
-        <div className="neu-inset" style={{ padding: '20px', borderRadius: '16px', marginBottom: '24px' }}>
+        <div className="neu-inset" style={{ padding: '20px', borderRadius: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
             <span style={{ fontWeight: 600 }}>Spending Limit</span>
             <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{limit.toFixed(2)} USDC</span>
@@ -158,7 +184,7 @@ export function SpendingLimitModal({ onFunded, onCancel }: Props) {
           </div>
         </div>
 
-        <div style={{ marginBottom: '24px' }}>
+        <div>
           <h4 style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '1px' }}>
             Agent Price List
           </h4>
@@ -168,7 +194,7 @@ export function SpendingLimitModal({ onFunded, onCancel }: Props) {
           </div>
         </div>
 
-        <div style={{ padding: '12px', backgroundColor: 'rgba(235, 87, 87, 0.1)', borderRadius: '12px', marginBottom: '24px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+        <div style={{ padding: '12px', backgroundColor: 'rgba(235, 87, 87, 0.1)', borderRadius: '12px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
           <Shield size={20} color="var(--accent)" style={{ flexShrink: 0, marginTop: '2px' }} />
           <p style={{ fontSize: '0.85rem', margin: 0, color: 'var(--text)' }}>
             <strong>100% Non-Custodial:</strong> The session key stays in your browser memory. Unspent USDC is automatically refunded after your workout.
@@ -198,6 +224,16 @@ export function SpendingLimitModal({ onFunded, onCancel }: Props) {
           >
             {loading ? <Loader className="animate-spin" size={20} /> : <Wallet size={20} />}
             Fund Session Wallet
+          </button>
+        </div>
+        <div style={{ marginTop: '16px', textAlign: 'center' }}>
+          <button
+            className="neu-btn"
+            style={{ padding: '10px 24px', fontSize: '0.9rem', color: 'var(--text-secondary)' }}
+            onClick={onSkip}
+            disabled={loading}
+          >
+            Skip Agentic Features
           </button>
         </div>
       </div>
