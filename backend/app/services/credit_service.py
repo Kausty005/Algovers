@@ -21,7 +21,7 @@ def get_credits(user_id: str) -> Optional[AICreditSession]:
     ai_state = user.get("ai_state", {})
     return {
         "credits": ai_state.get("credits", 0),
-        "model_name": ai_state.get("model_name", "gemini-1.5-flash-8b"),
+        "model_name": ai_state.get("model_name", "gemini-flash-lite-latest"),
         "tier": ai_state.get("tier", "basic")
     }
 

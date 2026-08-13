@@ -84,6 +84,8 @@ export function PaymentGate({ children }: { children: React.ReactNode }) {
       const fullNet  = 'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=';
       client.registerV1(shortNet, scheme);
       client.registerV1(fullNet, scheme);
+      client.register(shortNet, scheme);
+      client.register(fullNet, scheme);
       const fetchWithPay = wrapFetchWithPayment(window.fetch, client);
 
       // 2. Retry the check request with the payment wrapper

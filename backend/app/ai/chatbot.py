@@ -55,7 +55,6 @@ class ChatbotAI:
         fallback = _template_chat(message)
         response = ai_provider.generate(
             prompt, 
-            max_tokens=150, 
             temperature=0.7, 
             fallback=fallback, 
             model_name=model_name

@@ -27,9 +27,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 PROTECTED_SESSION_PATH = "/api/payment/session"
 PROTECTED_AI_PATHS = {
-    "/api/payment/ai-credits/basic": {"price": "0.05", "desc": "AI Basic Coach (10 Credits)", "model": "gemini-1.5-flash-8b"},
-    "/api/payment/ai-credits/pro": {"price": "0.1", "desc": "AI Pro Coach (10 Credits)", "model": "gemini-1.5-flash"},
-    "/api/payment/ai-credits/expert": {"price": "0.25", "desc": "AI Expert Coach (10 Credits)", "model": "gemini-1.5-pro"},
+    "/api/payment/ai-credits/basic": {"price": "0.05", "desc": "AI Basic Coach (10 Credits)", "model": "gemini-flash-lite-latest"},
+    "/api/payment/ai-credits/pro": {"price": "0.1", "desc": "AI Pro Coach (10 Credits)", "model": "gemini-flash-latest"},
+    "/api/payment/ai-credits/expert": {"price": "0.25", "desc": "AI Expert Coach (10 Credits)", "model": "gemini-pro-latest"},
 }
 
 # Agent-driven micro-payment routes (auto-purchased by the IronIQ agent)
@@ -90,24 +90,21 @@ def _apply_x402_avm_middleware(app: Flask) -> None:
     from x402.mechanisms.avm.exact import ExactAvmServerScheme  # type: ignore
     server.register(x402_config.network, ExactAvmServerScheme())
 
-    # Convert prices to micro-units (6 decimals) and pass asset in extra
     extra_args = {}
     if x402_config.asset and x402_config.asset.upper() != "ALGO":
         extra_args["asset"] = str(x402_config.asset)
 
-    def to_micro(price_str: str) -> str:
-        return str(int(float(price_str) * 1_000_000))
-
     routes = {}
 
-    # Add agent micro-payment routes
-    for path, info in PROTECTED_AGENT_PATHS.items():
+    # Add agent and AI micro-payment routes
+    all_protected_paths = {**PROTECTED_AGENT_PATHS, **PROTECTED_AI_PATHS}
+    for path, info in all_protected_paths.items():
         routes[f"{PROTECTED_METHOD} {path}"] = RouteConfig(
             accepts=[
                 PaymentOption(
                     scheme="exact",
                     pay_to=x402_config.receiver_address,
-                    price=to_micro(str(info['price'])),
+                    price=str(info['price']),
                     network=x402_config.network,
                     extra=extra_args if extra_args else None
                 )

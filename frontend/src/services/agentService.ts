@@ -35,7 +35,9 @@ let badScoreAccumulator = 0;
 let textGuidancePurchased = false;
 let voiceGuidancePurchased = false;
 let lastPurchaseTime = 0;
+let lastFailureTime = 0;
 let activityLog: AgentDecision[] = [];
+let isPurchasing = false;
 
 /**
  * Reset agent state for a new workout session.
@@ -77,10 +79,19 @@ export function isVoiceGuidanceUnlocked(): boolean {
 export async function evaluateFrame(
   frameResult: FrameResult,
   exerciseType: string,
-  elapsedSeconds: number
+  elapsedSeconds: number,
+  onPurchaseStart?: (service: string) => void,
+  onPurchaseEnd?: () => void
 ): Promise<AgentGuidanceResponse | null> {
-  const { formScore, formFeedback, repCount, movementState } = frameResult;
+  if (isPurchasing) return null;
+
   const now = Date.now();
+  // Cooldown: If a payment failed recently (e.g. insufficient funds), wait 30s before trying again
+  if (now - lastFailureTime < 30000) {
+    return null;
+  }
+
+  const { formScore, formFeedback, repCount, movementState } = frameResult;
 
   // ── Accumulate bad form score ──────────────────────────────────
   if (formScore < FORM_SCORE_THRESHOLD) {
@@ -130,7 +141,10 @@ export async function evaluateFrame(
       console.log(`[IronIQ Agent] 🤖 Using previously purchased ${serviceType} — ${reason}`);
     } else {
       console.log(`[IronIQ Agent] 🤖 Deciding to purchase ${serviceType} — ${reason}`);
+      if (onPurchaseStart) onPurchaseStart(serviceType);
     }
+
+    isPurchasing = true;
 
     // Reset accumulator so we don't immediately trigger again
     badScoreAccumulator = 0;
@@ -141,7 +155,7 @@ export async function evaluateFrame(
       formScore,
       formFeedback,
       movementState,
-    });
+    }, isAlreadyPurchased);
 
     // Mark as purchased
     if (serviceType === 'text-guidance') {
@@ -168,7 +182,11 @@ export async function evaluateFrame(
     return result;
   } catch (err) {
     console.error(`[IronIQ Agent] ❌ Failed to purchase ${serviceType}:`, err);
+    lastFailureTime = Date.now();
     return null;
+  } finally {
+    isPurchasing = false;
+    if (onPurchaseEnd) onPurchaseEnd();
   }
 }
 
@@ -186,7 +204,8 @@ async function purchaseGuidance(
     formScore: number;
     formFeedback: string;
     movementState: string;
-  }
+  },
+  isAlreadyPurchased: boolean
 ): Promise<AgentGuidanceResponse> {
   const url = `${BASE_URL}/api/agent/${service}`;
   const sessionAccount = getSessionAccount();
@@ -222,6 +241,8 @@ async function purchaseGuidance(
   const fullNet  = 'algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI=';
   client.registerV1(shortNet, scheme);
   client.registerV1(fullNet, scheme);
+  client.register(shortNet, scheme);
+  client.register(fullNet, scheme);
   
   const fetchWithPay = wrapFetchWithPayment(window.fetch, client);
 

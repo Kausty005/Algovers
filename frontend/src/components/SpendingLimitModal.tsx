@@ -200,19 +200,6 @@ export function SpendingLimitModal({ onFunded, onCancel }: Props) {
             Fund Session Wallet
           </button>
         </div>
-
-        <div style={{ marginTop: '16px', textAlign: 'center' }}>
-          <button 
-            onClick={() => {
-              createSessionWallet();
-              markSessionWalletFunded(limit, activeAddress || 'bypass-demo-address');
-              onFunded();
-            }}
-            style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '0.8rem', textDecoration: 'underline', cursor: 'pointer' }}
-          >
-            Skip & Fund (Demo Bypass)
-          </button>
-        </div>
       </div>
     </div>
   );

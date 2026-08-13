@@ -12,6 +12,11 @@ from __future__ import annotations
 import os
 import random
 import logging
+from dotenv import load_dotenv
+
+# Force reload of environment variables so that any changes to .env 
+# (like API keys) take effect immediately without a server restart.
+load_dotenv(override=True)
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +111,7 @@ def _get_gemini_model(model_name: str):
 
     api_key = os.getenv("GEMINI_API_KEY", "").strip()
     if not api_key:
+        logger.error("CRITICAL: GEMINI_API_KEY is not set in the environment! Falling back to templates.")
         return None
 
     try:
@@ -116,7 +122,7 @@ def _get_gemini_model(model_name: str):
         logger.info("Gemini model initialised: %s", model_name)
         return _gemini_models[model_name]
     except Exception as exc:
-        logger.warning("Failed to initialise Gemini: %s", exc)
+        logger.error("CRITICAL: Failed to initialise Gemini (is the model name correct?): %s", exc)
         return None
 
 
@@ -146,7 +152,7 @@ class AIModelProvider:
         """
         # Default fallback model if not specified
         if not model_name:
-            model_name = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+            model_name = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
         model = _get_gemini_model(model_name)
         if model:
@@ -154,7 +160,6 @@ class AIModelProvider:
                 response = model.generate_content(
                     prompt,
                     generation_config={
-                        "max_output_tokens": max_tokens,
                         "temperature": temperature,
                     },
                 )

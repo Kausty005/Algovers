@@ -11,63 +11,30 @@ export function ChatPage() {
   const [sessionId] = useState(() => 'chat-' + Math.random().toString(36).slice(2));
   const [credits, setCredits] = useState<number>(0);
   const [modalOpen, setModalOpen] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'required' | 'processing' | 'verified' | 'failed'>('idle');
-  const [error, setError] = useState<string | null>(null);
-  const [activeTier, setActiveTier] = useState<'basic' | 'pro' | 'expert'>('pro');
 
   useEffect(() => {
     // Show modal immediately if no credits
-    if (credits <= 0 && status === 'idle') {
+    if (credits <= 0) {
       setModalOpen(true);
     }
-  }, [credits, status]);
-
-  const handleSelectTier = async (tier: 'basic' | 'pro' | 'expert') => {
-    setStatus('processing');
-    setError(null);
-    setActiveTier(tier);
-    try {
-      const res = await paymentApi.buyAiCredits(tier, sessionId);
-      if (res.status === 'required') {
-        setStatus('required');
-      } else {
-        setStatus('verified');
-        setCredits(res.credits);
-      }
-    } catch (err: any) {
-      setStatus('failed');
-      setError(err.message || 'Payment initiation failed');
-    }
-  };
-
-  const handleConfirmPayment = async () => {
-    setStatus('processing');
-    try {
-      const res = await paymentApi.buyAiCredits(activeTier, sessionId, 'demo-verified-tx-123456789');
-      setStatus('verified');
-      setCredits(res.credits);
-    } catch (err: any) {
-      setStatus('failed');
-      setError('Could not verify payment. Please try again.');
-    }
-  };
+  }, [credits]);
 
   const handleCloseModal = () => {
     setModalOpen(false);
-    if (status === 'verified') {
-      setStatus('idle');
-    }
+  };
+
+  const handleSuccess = (newCredits: number) => {
+    setCredits(newCredits);
+    setModalOpen(false);
   };
 
   return (
     <div className="page-layout">
       <AiModelModal
         open={modalOpen}
-        status={status}
-        error={error}
-        onSelectTier={handleSelectTier}
+        sessionId={sessionId}
         onClose={handleCloseModal}
-        onConfirmPayment={handleConfirmPayment}
+        onSuccess={handleSuccess}
       />
 
       <div
