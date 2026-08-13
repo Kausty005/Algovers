@@ -92,6 +92,7 @@ export function WorkoutPage() {
       }
     }).catch(err => {
       console.error("Agent evaluation failed", err);
+      // We can optionally set an error state here if we want to show it on screen
     });
   }, [frameResult, exerciseType, elapsed, muted, workoutStarted, simulateBadForm, isAgentPurchasing]);
 
@@ -183,9 +184,9 @@ export function WorkoutPage() {
                 animation: 'fadeIn 0.2s ease-out'
               }}>
                 <Loader className="animate-spin" size={48} color="var(--accent)" style={{ marginBottom: '16px' }} />
-                <h3 style={{ color: 'white', margin: 0, fontSize: '1.2rem', fontWeight: 600 }}>Agent Negotiating Payment...</h3>
+                <h3 style={{ color: 'white', margin: 0, fontSize: '1.2rem', fontWeight: 600 }}>Purchasing Voice Guidance...</h3>
                 <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.9rem', marginTop: '8px' }}>
-                  Purchasing {purchasingService.replace('-', ' ')} on-chain (TestNet)
+                  Unlocking AI capabilities on-chain (TestNet)
                 </p>
                 <button
                   className="neu-btn"

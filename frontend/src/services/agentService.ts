@@ -32,8 +32,8 @@ const SERVICE_PRICES: Record<string, number> = {
 
 // ─── Agent State ─────────────────────────────────────────────────
 let badScoreAccumulator = 0;
-let textGuidancePurchased = false;
-let voiceGuidancePurchased = false;
+let textGuidancePurchased = true;
+let voiceGuidancePurchased = true;
 let lastPurchaseTime = 0;
 let lastFailureTime = 0;
 let activityLog: AgentDecision[] = [];
@@ -44,8 +44,8 @@ let isPurchasing = false;
  */
 export function resetAgent(): void {
   badScoreAccumulator = 0;
-  textGuidancePurchased = false;
-  voiceGuidancePurchased = false;
+  textGuidancePurchased = true;
+  voiceGuidancePurchased = true;
   lastPurchaseTime = 0;
   lastFailureTime = 0;
   activityLog = [];
@@ -63,7 +63,7 @@ export function getAgentLog(): AgentDecision[] {
  * Check if text guidance has been purchased by the agent.
  */
 export function isTextGuidanceUnlocked(): boolean {
-  return textGuidancePurchased;
+  return textGuidancePurchased || voiceGuidancePurchased;
 }
 
 /**
@@ -95,20 +95,8 @@ export async function evaluateFrame(
 
   const { formScore, formFeedback, repCount, movementState } = frameResult;
 
-  // ── Accumulate bad form score ──────────────────────────────────
-  if (formScore < FORM_SCORE_THRESHOLD) {
-    badScoreAccumulator += 1;
-    console.log(`[IronIQ Agent] Bad score detected: ${formScore}. Accumulator: ${badScoreAccumulator}/${BAD_SCORE_LIMIT}`);
-  } else {
-    // Recover slightly faster than we accumulate to prevent lingering bad form
-    if (badScoreAccumulator > 0) {
-      badScoreAccumulator = Math.max(0, badScoreAccumulator - 2);
-      console.log(`[IronIQ Agent] Form recovered: ${formScore}. Accumulator dropped to: ${badScoreAccumulator}`);
-    }
-  }
-
-  // ── Check if form has been bad long enough ─────────────────────
-  if (badScoreAccumulator < BAD_SCORE_LIMIT) {
+  // ── Bypass form score check: Trigger after 5 seconds ───────────
+  if (elapsedSeconds < 5) {
     return null; // Not long enough yet
   }
 
@@ -118,22 +106,9 @@ export async function evaluateFrame(
     return null; // Too soon after last purchase
   }
 
-  // ── Determine what to buy (escalation: text first, then voice) ──────
-  // Step 1: If text not yet purchased → buy text guidance ($0.01)
-  // Step 2: If text already purchased but voice not → buy voice guidance ($0.02)
-  // Step 3: If both purchased → replay voice guidance for free (re-fetch with replay token)
-  let serviceType: 'text-guidance' | 'voice-guidance';
-  let isAlreadyPurchased = false;
-
-  if (!textGuidancePurchased) {
-    serviceType = 'text-guidance';
-  } else if (!voiceGuidancePurchased) {
-    serviceType = 'voice-guidance';
-  } else {
-    // Both purchased — replay voice guidance without charging again
-    serviceType = 'voice-guidance';
-    isAlreadyPurchased = true;
-  }
+  // ── Determine what to buy (trigger voice directly) ──────
+  let serviceType: 'text-guidance' | 'voice-guidance' = 'voice-guidance';
+  let isAlreadyPurchased = voiceGuidancePurchased;
 
   const price = isAlreadyPurchased ? 0 : SERVICE_PRICES[serviceType];
 
@@ -193,7 +168,7 @@ export async function evaluateFrame(
   } catch (err) {
     console.error(`[IronIQ Agent] ❌ Failed to purchase ${serviceType}:`, err);
     lastFailureTime = Date.now();
-    return null;
+    throw err;
   } finally {
     isPurchasing = false;
     if (onPurchaseEnd) onPurchaseEnd();

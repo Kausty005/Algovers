@@ -74,9 +74,9 @@ class SquatAnalyzer(ExerciseAnalyzer):
         score = 100.0
         feedback = "Good form."
 
-        # Static pose penalty (standing still or paused mid-rep)
+        # Static pose penalty (paused mid-rep)
         # 30 frames is roughly 3 seconds
-        if frames_static > 30:
+        if frames_static > 30 and current_state != self.STANDING:
             static_penalty = min(80, (frames_static - 30) * 1.5)
             score -= static_penalty
             feedback = "Keep moving! Don't stand still."

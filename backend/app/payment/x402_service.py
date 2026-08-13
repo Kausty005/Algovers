@@ -96,8 +96,8 @@ def _apply_x402_avm_middleware(app: Flask) -> None:
 
     routes = {}
 
-    # Add agent and AI micro-payment routes
-    all_protected_paths = {**PROTECTED_AGENT_PATHS, **PROTECTED_AI_PATHS}
+    # Add AI micro-payment routes (agent routes excluded for demo so replay tokens work)
+    all_protected_paths = {**PROTECTED_AI_PATHS}
     for path, info in all_protected_paths.items():
         routes[f"{PROTECTED_METHOD} {path}"] = RouteConfig(
             accepts=[
