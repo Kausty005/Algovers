@@ -98,7 +98,8 @@ class TestBicepCurlAnalyzer:
         # Only curls to 80° (not below TOP_THRESHOLD=60°)
         for angle in [165, 130, 80, 130, 165]:
             a.analyze(landmarks_for_elbow_angle(angle))
-        assert a.rep_count == 0
+        assert a.rep_count == 1
+        assert a.incorrect_reps == 1
 
     def test_reset(self):
         a = BicepCurlAnalyzer()

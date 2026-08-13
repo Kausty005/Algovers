@@ -22,7 +22,7 @@ def build_report(session: WorkoutSession) -> WorkoutReport:
 
     # Look up previous session (exclude current session)
     previous_sessions = [
-        s for s in session_service.list_completed_sessions_for_exercise(session.exercise)
+        s for s in session_service.list_completed_sessions_for_exercise(session.exercise, session.user_id)
         if s.session_id != session.session_id
     ]
     previous_reps = 0

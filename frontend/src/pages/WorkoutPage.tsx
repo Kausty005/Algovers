@@ -6,15 +6,13 @@ import { RepCounter } from '../components/RepCounter';
 import { WorkoutTimer } from '../components/WorkoutTimer';
 import { GuidancePanel } from '../components/GuidancePanel';
 import { VoiceIndicator } from '../components/VoiceIndicator';
+import { AgentActivityLog } from '../components/AgentActivityLog';
 import { useWorkoutSession } from '../hooks/useWorkoutSession';
-import { aiApi } from '../services/aiApi';
-import type { ExerciseType, GuidanceResponse } from '../types';
+import { evaluateFrame, getAgentLog, isTextGuidanceUnlocked, isVoiceGuidanceUnlocked, resetAgent } from '../services/agentService';
+import { refundSessionWallet } from '../services/sessionWallet';
+import type { ExerciseType, AgentDecision } from '../types';
 
 const isDev = import.meta.env.DEV;
-const ai = aiApi; // Enforce real AI API
-
-// Guidance call cooldown (ms)
-const GUIDANCE_COOLDOWN = 4000;
 
 export function WorkoutPage() {
   const { exercise } = useParams<{ exercise: string }>();
@@ -22,17 +20,17 @@ export function WorkoutPage() {
   const exerciseType = (exercise as ExerciseType) ?? 'squat';
 
   // ── Payment handled in ExercisePage — session is pre-unlocked ────────
-  const [sessionUnlocked] = useState(true); // always unlocked when we arrive here
+  const [sessionUnlocked] = useState(true);
 
   // ── Workout session ───────────────────────────────────────────
   const { session, frameResult, elapsed, loading, error: sessionError, startSession, sendFrame, endSession } = useWorkoutSession();
   const [workoutStarted, setWorkoutStarted] = useState(false);
 
-  // ── Guidance ──────────────────────────────────────────────────
-  const [guidance, setGuidance] = useState<GuidanceResponse>({ text: '', priority: 'low' });
-  const [guidanceLoading, setGuidanceLoading] = useState(false);
-  const lastGuidanceCallRef = useRef<number>(0);
-
+  // ── Agent State ───────────────────────────────────────────────
+  const [agentDecisions, setAgentDecisions] = useState<AgentDecision[]>([]);
+  const [guidanceText, setGuidanceText] = useState('');
+  const [guidancePriority, setGuidancePriority] = useState<'low'|'medium'|'high'>('low');
+  
   // ── Voice ─────────────────────────────────────────────────────
   const [voiceActive, setVoiceActive] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -42,58 +40,46 @@ export function WorkoutPage() {
   useEffect(() => {
     if (!workoutStarted) {
       setWorkoutStarted(true);
+      resetAgent();
       startSession(exerciseType);
     }
   }, [workoutStarted, exerciseType, startSession]);
 
-  // ── Fetch AI guidance on rep complete or form change ─────────
-  const fetchGuidance = useCallback(async () => {
-    if (!frameResult) return;
-    const now = Date.now();
-    if (now - lastGuidanceCallRef.current < GUIDANCE_COOLDOWN) return;
-    lastGuidanceCallRef.current = now;
+  // ── Feed frames to the IronIQ Agent ──────────────────────────
+  useEffect(() => {
+    if (!frameResult || !workoutStarted) return;
 
-    setGuidanceLoading(true);
-    try {
-      const res = await ai.guidance({
-        exercise: exerciseType,
-        repCount: frameResult.repCount,
-        formScore: frameResult.formScore,
-        formFeedback: frameResult.formFeedback,
-        movementState: frameResult.movementState,
-      });
-      setGuidance(res);
+    // Run agent evaluation asynchronously
+    evaluateFrame(frameResult, exerciseType, elapsed).then(response => {
+      if (response) {
+        // Agent made a purchase! Update UI
+        setAgentDecisions(getAgentLog());
+        setGuidanceText(response.text);
+        setGuidancePriority(response.priority);
 
-      // TTS
-      if (!muted && res.text) {
-        setVoiceActive(true);
-        try {
-          const url = await ai.voice({ text: res.text });
-          if (url) setAudioUrl(url);
-        } catch {
-          // TTS unavailable — silent fail
-        } finally {
-          setTimeout(() => setVoiceActive(false), 3500);
+        // If it bought voice guidance, play it
+        if (response.service === 'voice-guidance' && response.audioBase64 && !muted) {
+          const url = `data:${response.audioMimeType};base64,${response.audioBase64}`;
+          setAudioUrl(url);
+          setVoiceActive(true);
+          setTimeout(() => setVoiceActive(false), 4000);
         }
       }
-    } catch {
-      // Guidance unavailable — don't crash
-    } finally {
-      setGuidanceLoading(false);
-    }
-  }, [frameResult, exerciseType, muted]);
-
-  useEffect(() => {
-    if (frameResult?.repCompleted || (frameResult?.formScore && frameResult.formScore < 65)) {
-      fetchGuidance();
-    }
-  }, [frameResult, fetchGuidance]);
+    }).catch(err => {
+      console.error("Agent evaluation failed", err);
+    });
+  }, [frameResult, exerciseType, elapsed, muted, workoutStarted]);
 
   // ── End workout ───────────────────────────────────────────────
   const handleEndWorkout = async () => {
+    // Refund any remaining session wallet balance
+    refundSessionWallet();
+    
     await endSession();
     if (session?.sessionId) {
       navigate(`/report/${session.sessionId}`);
+    } else {
+      navigate('/dashboard');
     }
   };
 
@@ -111,7 +97,7 @@ export function WorkoutPage() {
           alignItems: 'start',
         }}
       >
-        {/* Left: Camera */}
+        {/* Left: Camera & Agent Log */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {/* Session header */}
           <div
@@ -159,6 +145,11 @@ export function WorkoutPage() {
             </div>
           )}
 
+          {/* Agent Activity Log */}
+          <div style={{ height: '300px' }}>
+            <AgentActivityLog decisions={agentDecisions} />
+          </div>
+
           {/* End Workout button */}
           {workoutStarted && (
             <button
@@ -205,30 +196,26 @@ export function WorkoutPage() {
             </div>
           )}
 
-          {/* AI Guidance */}
+          {/* AI Guidance (Agent Locked/Unlocked) */}
           <GuidancePanel
-            message={guidance.text || (workoutStarted ? 'Analyzing your form…' : 'Waiting to start…')}
-            priority={guidance.priority}
-            loading={guidanceLoading}
+            message={guidanceText || (isTextGuidanceUnlocked() ? 'Analyzing your form…' : 'Agent monitoring...')}
+            priority={guidancePriority}
+            locked={!isTextGuidanceUnlocked()}
+            agentPurchased={isTextGuidanceUnlocked()}
           />
 
-          {/* Voice indicator */}
+          {/* Voice indicator (Agent Locked/Unlocked) */}
           <VoiceIndicator
             active={voiceActive}
             muted={muted}
             onToggleMute={() => setMuted((m) => !m)}
             audioUrl={audioUrl}
+            locked={!isVoiceGuidanceUnlocked()}
+            agentPurchased={isVoiceGuidanceUnlocked()}
           />
 
         </div>
       </div>
-
-      {/* Mobile responsive override */}
-      <style>{`
-        @media (max-width: 768px) {
-          .workout-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
     </div>
   );
 }

@@ -9,11 +9,17 @@ from app.models.workout import WorkoutSession
 
 @pytest.fixture(autouse=True)
 def clear_sessions():
+    from app.db import get_db
     session_service._sessions.clear()
     session_service._analyzers.clear()
+    db = get_db()
+    if db is not None:
+        db.workouts.delete_many({"userId": "test_user"})
     yield
     session_service._sessions.clear()
     session_service._analyzers.clear()
+    if db is not None:
+        db.workouts.delete_many({"userId": "test_user"})
 
 
 class TestReportService:
@@ -25,7 +31,7 @@ class TestReportService:
         incorrect=2,
         form_scores=None,
     ) -> WorkoutSession:
-        session = session_service.create_session(exercise)
+        session = session_service.create_session(exercise, user_id="test_user")
         session.rep_count = rep_count
         session.correct_reps = correct
         session.incorrect_reps = incorrect

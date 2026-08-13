@@ -2,20 +2,33 @@ import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { ExerciseSelector } from '../components/ExerciseSelector';
+import { SpendingLimitModal } from '../components/SpendingLimitModal';
 import type { ExerciseType } from '../types';
 
 export function ExercisePage() {
   const [selected, setSelected] = useState<ExerciseType | null>(null);
+  const [showModal, setShowModal] = useState(false);
   const navigate = useNavigate();
 
-  // Since payment is gated by PaymentGate, we can navigate directly
   const handleStart = useCallback(() => {
     if (!selected) return;
+    setShowModal(true);
+  }, [selected]);
+
+  const handleFunded = useCallback(() => {
+    setShowModal(false);
     navigate(`/workout/${selected}`);
   }, [selected, navigate]);
 
   return (
     <div className="page-layout">
+      {showModal && (
+        <SpendingLimitModal 
+          onFunded={handleFunded} 
+          onCancel={() => setShowModal(false)} 
+        />
+      )}
+      
       <div className="container" style={{ paddingTop: '40px', paddingBottom: '60px', maxWidth: '640px' }}>
         <div style={{ marginBottom: '36px' }} className="animate-fade-up">
           <h1 className="neu-heading" style={{ fontSize: '2rem', marginBottom: '8px' }}>
@@ -40,7 +53,7 @@ export function ExercisePage() {
               style={{ padding: '16px 36px', fontSize: '1.05rem', width: '100%' }}
               onClick={handleStart}
             >
-              Start {selected.replace('_', ' ')} Session
+              Set Up Session Wallet
               <ChevronRight size={20} />
             </button>
           ) : (

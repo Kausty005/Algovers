@@ -31,6 +31,12 @@ PROTECTED_AI_PATHS = {
     "/api/payment/ai-credits/pro": {"price": "0.1", "desc": "AI Pro Coach (10 Credits)", "model": "gemini-1.5-flash"},
     "/api/payment/ai-credits/expert": {"price": "0.25", "desc": "AI Expert Coach (10 Credits)", "model": "gemini-1.5-pro"},
 }
+
+# Agent-driven micro-payment routes (auto-purchased by the IronIQ agent)
+PROTECTED_AGENT_PATHS = {
+    "/api/agent/text-guidance": {"price": "0.01", "desc": "Agent Text Guidance"},
+    "/api/agent/voice-guidance": {"price": "0.02", "desc": "Agent Voice Guidance"},
+}
 PROTECTED_METHOD = "POST"
 
 
@@ -50,27 +56,23 @@ def apply_x402_middleware(app: Flask) -> None:
         _apply_passthrough_middleware(app)
         return
 
-    if not x402_config.receiver_address:
-        logger.warning(
-            "X402_RECEIVER_ADDRESS is not set. "
-            "The payment middleware will operate in DEMO mode (no real chain verification). "
-            "Set X402_RECEIVER_ADDRESS in .env to enable real Algorand payments."
-        )
-        _apply_demo_middleware(app)
-        return
+    # 1. ALWAYS apply demo middleware (handles workout session & AI paths)
+    _apply_demo_middleware(app)
 
-    try:
-        _apply_x402_avm_middleware(app)
-    except ImportError:
-        logger.warning(
-            "x402-avm package not found. "
-            "Install with: pip install \"x402-avm[flask,avm]\". "
-            "Falling back to demo 402 middleware."
-        )
-        _apply_demo_middleware(app)
-    except Exception as exc:
-        logger.error("Failed to apply x402-avm middleware: %s. Falling back to demo.", exc)
-        _apply_demo_middleware(app)
+    # 2. IF a receiver address is set, ALSO apply the real x402-avm middleware
+    #    (but ONLY for the agentic voice guidance paths)
+    # FOR HACKATHON DEMO: We skip the real avm middleware so the fake session wallet payments work.
+    if x402_config.receiver_address:
+        try:
+            _apply_x402_avm_middleware(app)
+        except ImportError:
+            logger.warning(
+                "x402-avm package not found. "
+                "Install with: pip install \"x402-avm[flask,avm]\". "
+                "Agentic features will not have real on-chain payment protection."
+            )
+        except Exception as exc:
+            logger.error("Failed to apply x402-avm middleware to agent paths: %s", exc)
 
 
 def _apply_x402_avm_middleware(app: Flask) -> None:
@@ -88,48 +90,26 @@ def _apply_x402_avm_middleware(app: Flask) -> None:
     from x402.mechanisms.avm.exact import ExactAvmServerScheme  # type: ignore
     server.register(x402_config.network, ExactAvmServerScheme())
 
-    routes = {
-        f"{PROTECTED_METHOD} {PROTECTED_SESSION_PATH}": RouteConfig(
-            accepts=[
-                PaymentOption(
-                    scheme="exact",
-                    pay_to=x402_config.receiver_address,
-                    price=str(x402_config.price),
-                    network=x402_config.network,
-                )
-            ],
-            mime_type="application/json",
-            description=(
-                f"Gym Buddy workout session — {x402_config.price} "
-                f"{x402_config.asset} on Algorand {x402_config.network}"
-            ),
-        ),
-        f"GET /api/payment/check": RouteConfig(
-            accepts=[
-                PaymentOption(
-                    scheme="exact",
-                    pay_to=x402_config.receiver_address,
-                    price=str(x402_config.price),
-                    network=x402_config.network,
-                )
-            ],
-            mime_type="application/json",
-            description=(
-                f"Gym Buddy workout session access — {x402_config.price} "
-                f"{x402_config.asset} on Algorand {x402_config.network}"
-            ),
-        )
-    }
+    # Convert prices to micro-units (6 decimals) and pass asset in extra
+    extra_args = {}
+    if x402_config.asset and x402_config.asset.upper() != "ALGO":
+        extra_args["asset"] = str(x402_config.asset)
 
-    # Add AI credit routes
-    for path, info in PROTECTED_AI_PATHS.items():
+    def to_micro(price_str: str) -> str:
+        return str(int(float(price_str) * 1_000_000))
+
+    routes = {}
+
+    # Add agent micro-payment routes
+    for path, info in PROTECTED_AGENT_PATHS.items():
         routes[f"{PROTECTED_METHOD} {path}"] = RouteConfig(
             accepts=[
                 PaymentOption(
                     scheme="exact",
                     pay_to=x402_config.receiver_address,
-                    price=str(info['price']),
+                    price=to_micro(str(info['price'])),
                     network=x402_config.network,
+                    extra=extra_args if extra_args else None
                 )
             ],
             mime_type="application/json",
@@ -138,8 +118,7 @@ def _apply_x402_avm_middleware(app: Flask) -> None:
 
     payment_middleware(app, routes=routes, server=server)  # type: ignore
     logger.info(
-        "x402-avm middleware applied to %s and AI credit routes",
-        PROTECTED_SESSION_PATH
+        "x402-avm middleware applied ONLY to agentic micro-payment routes"
     )
 
 
@@ -157,7 +136,7 @@ def _apply_passthrough_middleware(app: Flask) -> None:
         # For the protected session endpoint, inject a fake X-PAYMENT header
         # so the Flask route handler (which checks jwt) still works normally.
         if method == PROTECTED_METHOD and (
-            path == PROTECTED_SESSION_PATH or path in PROTECTED_AI_PATHS
+            path == PROTECTED_SESSION_PATH or path in PROTECTED_AI_PATHS or path in PROTECTED_AGENT_PATHS
         ):
             environ["HTTP_X_PAYMENT"] = "bypass-dev"
 
@@ -182,8 +161,11 @@ def _apply_demo_middleware(app: Flask) -> None:
         path = environ.get("PATH_INFO", "")
         method = environ.get("REQUEST_METHOD", "")
 
-        if method == PROTECTED_METHOD and (path == PROTECTED_SESSION_PATH or path in PROTECTED_AI_PATHS):
+        if (method == PROTECTED_METHOD and (path == PROTECTED_SESSION_PATH or path in PROTECTED_AI_PATHS or path in PROTECTED_AGENT_PATHS)) or (method == "GET" and path == "/api/payment/check"):
             x_payment = environ.get("HTTP_X_PAYMENT", "") or environ.get("HTTP_PAYMENT_SIGNATURE", "")
+            auth_header = environ.get("HTTP_AUTHORIZATION", "")
+            if "x402" in auth_header:
+                x_payment = auth_header
 
             if not x_payment:
                 # Determine price and desc
@@ -235,8 +217,22 @@ def _apply_demo_middleware(app: Flask) -> None:
                         ("Content-Type", "application/json"),
                         ("Content-Length", str(len(body))),
                         ("Access-Control-Allow-Origin", "*"),
+                        ("Access-Control-Expose-Headers", "WWW-Authenticate, payment-required"),
+                        ("payment-required", __import__('base64').b64encode(body).decode('utf-8')),
+                        ("WWW-Authenticate", f'x402 version="1", network="{x402_config.network}", scheme="exact", exact-pay-to="{x402_config.receiver_address or "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}", exact-price="{micro_amount}", exact-asset="{x402_config.asset}"'),
                     ],
                 )
+                return [body]
+
+            # If paid and it's the check endpoint, return 200 directly
+            if method == "GET" and path == "/api/payment/check":
+                import json
+                body = json.dumps({"status": "verified"}).encode()
+                start_response("200 OK", [
+                    ("Content-Type", "application/json"),
+                    ("Content-Length", str(len(body))),
+                    ("Access-Control-Allow-Origin", "*")
+                ])
                 return [body]
 
             # X-PAYMENT present — pass through to Flask handler

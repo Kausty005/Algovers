@@ -11,7 +11,7 @@ import os
 # Ensure no real LLM key is used during tests
 os.environ.setdefault("GEMINI_API_KEY", "")
 os.environ.setdefault("X402_RECEIVER_ADDRESS", "")
-os.environ.setdefault("X402_NETWORK", "testnet")
+os.environ.setdefault("X402_NETWORK", "algorand-testnet")
 
 
 @pytest.fixture
@@ -25,6 +25,23 @@ def app():
 @pytest.fixture
 def client(app):
     return app.test_client()
+
+@pytest.fixture
+def auth_headers(app):
+    from flask_jwt_extended import create_access_token
+    from app.db import get_db
+    from bson.objectid import ObjectId
+    user_id = "507f1f77bcf86cd799439011"
+    with app.app_context():
+        db = get_db()
+        if db is not None:
+            db.users.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$set": {"ai_state": {"credits": 100, "model_name": "gemini-1.5-flash-8b", "tier": "basic"}}},
+                upsert=True
+            )
+        token = create_access_token(identity=user_id)
+        return {"Authorization": f"Bearer {token}"}
 
 
 # ---------------------------------------------------------------------------
@@ -138,35 +155,38 @@ class TestMotivationEndpoint:
 # ---------------------------------------------------------------------------
 
 class TestChatEndpoint:
-    def test_returns_200_with_valid_message(self, client):
+    def test_returns_200_with_valid_message(self, client, auth_headers):
         resp = client.post(
             "/api/ai/chat",
             json={"message": "How can I improve my squat?"},
+            headers=auth_headers
         )
         assert resp.status_code == 200
 
-    def test_response_has_response_field(self, client):
+    def test_response_has_response_field(self, client, auth_headers):
         resp = client.post(
             "/api/ai/chat",
             json={"message": "What exercise should I do?"},
+            headers=auth_headers
         )
         data = resp.get_json()
         assert "response" in data
         assert isinstance(data["response"], str)
         assert len(data["response"]) > 0
 
-    def test_missing_message_returns_400(self, client):
-        resp = client.post("/api/ai/chat", json={})
+    def test_missing_message_returns_400(self, client, auth_headers):
+        resp = client.post("/api/ai/chat", json={}, headers=auth_headers)
         assert resp.status_code == 400
 
-    def test_empty_message_returns_400(self, client):
-        resp = client.post("/api/ai/chat", json={"message": "   "})
+    def test_empty_message_returns_400(self, client, auth_headers):
+        resp = client.post("/api/ai/chat", json={"message": "   "}, headers=auth_headers)
         assert resp.status_code == 400
 
-    def test_medical_question_redirects_to_doctor(self, client):
+    def test_medical_question_redirects_to_doctor(self, client, auth_headers):
         resp = client.post(
             "/api/ai/chat",
             json={"message": "Can you diagnose my knee pain?"},
+            headers=auth_headers
         )
         data = resp.get_json()
         # Should still return 200 but with a safe redirect response
@@ -175,8 +195,8 @@ class TestChatEndpoint:
         response_lower = data["response"].lower()
         assert any(word in response_lower for word in ["professional", "doctor", "healthcare", "medical"])
 
-    def test_bicep_curl_question(self, client):
-        resp = client.post("/api/ai/chat", json={"message": "How do I do a bicep curl correctly?"})
+    def test_bicep_curl_question(self, client, auth_headers):
+        resp = client.post("/api/ai/chat", json={"message": "How do I do a bicep curl correctly?"}, headers=auth_headers)
         assert resp.status_code == 200
 
 

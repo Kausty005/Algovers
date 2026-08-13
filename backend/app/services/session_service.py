@@ -30,20 +30,20 @@ def get_session(session_id: str) -> Optional[WorkoutSession]:
         
     # If not in memory, check MongoDB for completed sessions
     db = get_db()
-    data = db.workouts.find_one({"session_id": session_id})
+    data = db.workouts.find_one({"sessionId": session_id})
     if data:
         session = WorkoutSession(
-            session_id=data["session_id"],
-            user_id=data.get("user_id", ""),
-            exercise=data["exercise"],
-            start_time=data["start_time"],
-            end_time=data["end_time"],
-            rep_count=data["rep_count"],
-            correct_reps=data["correct_reps"],
-            incorrect_reps=data["incorrect_reps"],
-            form_scores=data["form_scores"],
-            movement_state=data["movement_state"],
-            status=data["status"]
+            session_id=data.get("sessionId", ""),
+            user_id=data.get("userId", ""),
+            exercise=data.get("exercise", ""),
+            start_time=data.get("startTime", 0.0),
+            end_time=data.get("endTime"),
+            rep_count=data.get("repCount", 0),
+            correct_reps=data.get("correctReps", 0),
+            incorrect_reps=data.get("incorrectReps", 0),
+            form_scores=data.get("formScores", []),
+            movement_state=data.get("movementState", "unknown"),
+            status=data.get("status", "completed")
         )
         return session
     return None
@@ -77,21 +77,21 @@ def end_session(session_id: str) -> Optional[WorkoutSession]:
 def list_completed_sessions_for_exercise(exercise: str, user_id: str) -> List[WorkoutSession]:
     """Return all completed sessions for a given exercise and user (for improvement calc)."""
     db = get_db()
-    cursor = db.workouts.find({"exercise": exercise, "user_id": user_id, "status": "completed"})
+    cursor = db.workouts.find({"exercise": exercise, "userId": user_id, "status": "completed"})
     sessions = []
     for data in cursor:
         sessions.append(WorkoutSession(
-            session_id=data["session_id"],
-            user_id=data.get("user_id", ""),
-            exercise=data["exercise"],
-            start_time=data["start_time"],
-            end_time=data["end_time"],
-            rep_count=data["rep_count"],
-            correct_reps=data["correct_reps"],
-            incorrect_reps=data["incorrect_reps"],
-            form_scores=data["form_scores"],
-            movement_state=data["movement_state"],
-            status=data["status"]
+            session_id=data.get("sessionId", ""),
+            user_id=data.get("userId", ""),
+            exercise=data.get("exercise", ""),
+            start_time=data.get("startTime", 0.0),
+            end_time=data.get("endTime"),
+            rep_count=data.get("repCount", 0),
+            correct_reps=data.get("correctReps", 0),
+            incorrect_reps=data.get("incorrectReps", 0),
+            form_scores=data.get("formScores", []),
+            movement_state=data.get("movementState", "unknown"),
+            status=data.get("status", "completed")
         ))
     return sessions
 

@@ -13,6 +13,8 @@ from typing import Tuple
 
 from app.services.pose_service import Landmarks
 
+MIN_REP_FORM_SCORE = 50.0
+
 
 class ExerciseAnalyzer(ABC):
     """

@@ -42,6 +42,7 @@ def landmarks_for_knee_angle(angle_deg: float):
         LEFT_HIP:   {"x": hip[0],   "y": hip[1],   "visibility": 1.0},
         LEFT_KNEE:  {"x": knee[0],  "y": knee[1],  "visibility": 1.0},
         LEFT_ANKLE: {"x": ankle[0], "y": ankle[1], "visibility": 1.0},
+        11:         {"x": hip[0],   "y": hip[1] - 0.2, "visibility": 1.0}, # LEFT_SHOULDER (11) directly above hip
     })
 
 

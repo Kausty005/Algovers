@@ -13,7 +13,7 @@ import os
 
 os.environ.setdefault("GEMINI_API_KEY", "")
 os.environ.setdefault("X402_RECEIVER_ADDRESS", "")
-os.environ.setdefault("X402_NETWORK", "testnet")
+os.environ.setdefault("X402_NETWORK", "algorand-testnet")
 os.environ.setdefault("X402_PRICE", "0.1")
 os.environ.setdefault("X402_ASSET", "10458941")
 
@@ -29,6 +29,13 @@ def app():
 @pytest.fixture
 def client(app):
     return app.test_client()
+
+@pytest.fixture
+def auth_headers(app):
+    from flask_jwt_extended import create_access_token
+    with app.app_context():
+        token = create_access_token(identity="test_user")
+        return {"Authorization": f"Bearer {token}"}
 
 
 # ---------------------------------------------------------------------------
@@ -70,70 +77,82 @@ class TestPaymentStatus:
 # ---------------------------------------------------------------------------
 
 class TestPaymentSession:
-    def test_unpaid_request_returns_402(self, client):
+    def test_unpaid_request_returns_402(self, client, auth_headers):
         """Without X-PAYMENT header the demo middleware returns 402."""
         resp = client.post(
             "/api/payment/session",
             json={"exercise": "squat"},
+            headers=auth_headers,
         )
         assert resp.status_code == 402
 
-    def test_402_response_has_payment_details(self, client):
+    def test_402_response_has_payment_details(self, client, auth_headers):
         """The 402 body must contain x402-spec payment requirements."""
         resp = client.post(
             "/api/payment/session",
             json={"exercise": "squat"},
+            headers=auth_headers,
         )
         assert resp.status_code == 402
         data = resp.get_json()
         # x402 spec response
         assert "accepts" in data or "error" in data  # either x402-avm format or demo format
 
-    def test_paid_request_returns_200(self, client):
+    def test_paid_request_returns_200(self, client, auth_headers):
         """With X-PAYMENT header the middleware passes through → 200."""
+        headers = dict(auth_headers)
+        headers["X-PAYMENT"] = "demo-verified-token-abc123"
         resp = client.post(
             "/api/payment/session",
             json={"exercise": "squat"},
-            headers={"X-PAYMENT": "demo-verified-token-abc123"},
+            headers=headers,
         )
         assert resp.status_code == 200
 
-    def test_paid_response_has_session_id(self, client):
+    def test_paid_response_has_session_id(self, client, auth_headers):
+        headers = dict(auth_headers)
+        headers["X-PAYMENT"] = "demo-verified-token-abc123"
         resp = client.post(
             "/api/payment/session",
             json={"exercise": "squat"},
-            headers={"X-PAYMENT": "demo-verified-token-abc123"},
+            headers=headers,
         )
         assert resp.status_code == 200
         data = resp.get_json()
         assert "sessionId" in data
         assert data["sessionId"].startswith("pay-")
 
-    def test_paid_response_status_is_verified(self, client):
+    def test_paid_response_status_is_verified(self, client, auth_headers):
+        headers = dict(auth_headers)
+        headers["X-PAYMENT"] = "demo-verified-token-abc123"
         resp = client.post(
             "/api/payment/session",
             json={"exercise": "squat"},
-            headers={"X-PAYMENT": "demo-verified-token-abc123"},
+            headers=headers,
         )
         data = resp.get_json()
         assert data["status"] == "verified"
 
-    def test_paid_response_has_amount_and_asset(self, client):
+    def test_paid_response_has_amount_and_asset(self, client, auth_headers):
+        headers = dict(auth_headers)
+        headers["X-PAYMENT"] = "demo-verified-token-abc123"
         resp = client.post(
             "/api/payment/session",
-            json={"exercise": "bicep_curl"},
-            headers={"X-PAYMENT": "demo-verified-token-abc123"},
+            json={"exercise": "squat"},
+            headers=headers,
         )
         data = resp.get_json()
         assert "amount" in data
         assert "asset" in data
         assert data["asset"] == "10458941"
 
-    def test_paid_response_has_network(self, client):
+    def test_paid_response_has_network(self, client, auth_headers):
+        headers = dict(auth_headers)
+        headers["X-PAYMENT"] = "demo-verified-token-abc123"
         resp = client.post(
             "/api/payment/session",
-            json={"exercise": "push_up"},
-            headers={"X-PAYMENT": "demo-verified-token-abc123"},
+            json={"exercise": "squat"},
+            headers=headers,
         )
         data = resp.get_json()
         assert "network" in data
@@ -166,12 +185,14 @@ class TestPaymentVerify:
         )
         assert resp.status_code == 404
 
-    def test_valid_session_returns_verified_field(self, client):
-        # First create a session
+    def test_valid_session_returns_verified_field(self, client, auth_headers):
+        # 1) Create session (paid)
+        headers = dict(auth_headers)
+        headers["X-PAYMENT"] = "demo-verified-token-abc123"
         create_resp = client.post(
             "/api/payment/session",
             json={"exercise": "squat"},
-            headers={"X-PAYMENT": "demo-verified-token"},
+            headers=headers,
         )
         assert create_resp.status_code == 200
         session_id = create_resp.get_json()["sessionId"]

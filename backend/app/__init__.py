@@ -48,8 +48,10 @@ def create_app() -> Flask:
     # ── Agent 3: AI + Payment blueprints ─────────────────────────────
     from .routes.ai import ai_bp
     from .routes.payment import payment_bp
+    from .routes.agent import agent_bp
     app.register_blueprint(ai_bp)
     app.register_blueprint(payment_bp)
+    app.register_blueprint(agent_bp)
 
     from .routes.auth import auth_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')

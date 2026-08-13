@@ -11,9 +11,17 @@ def client():
     with app.test_client() as client:
         yield client
 
-def test_x402_payment_required_with_correct_config(client):
+@pytest.fixture
+def auth_headers(client):
+    from flask_jwt_extended import create_access_token
+    from app.db import get_db
+    with client.application.app_context():
+        token = create_access_token(identity="test_user")
+        return {"Authorization": f"Bearer {token}"}
+
+def test_x402_payment_required_with_correct_config(client, auth_headers):
     """Test that requesting a session returns 402 with correct x402 configuration."""
-    response = client.post("/api/payment/session", json={"exercise": "squat"})
+    response = client.post("/api/payment/session", json={"exercise": "squat"}, headers=auth_headers)
     
     assert response.status_code == 402
     
@@ -30,8 +38,8 @@ def test_x402_payment_required_with_correct_config(client):
     
     accept = data["accepts"][0]
     assert accept["scheme"] == "exact"
-    assert accept["network"] == "algorand:SGO1GKSzyE7IEPItTxCByw9x8FmnrCDexi9/cOUJOiI="
+    assert accept["network"] == "algorand-testnet"
     assert accept["asset"] == "10458941"  # TestNet USDC
-    assert accept["amount"] == "5000"
+    assert accept["amount"] == "100000"
     assert "payTo" in accept
     assert accept["payTo"] != "SET_X402_RECEIVER_ADDRESS"

@@ -111,3 +111,34 @@ export interface ApiState<T> {
   loading: boolean;
   error: string | null;
 }
+
+// ─── Agentic Payment ─────────────────────────────────────────────
+export type AgentServiceType = 'text-guidance' | 'voice-guidance';
+
+export interface AgentDecision {
+  id: string;
+  action: AgentServiceType;
+  amount: string;        // e.g. "0.01"
+  transactionId: string; // Algorand TX ID
+  timestamp: number;
+  reason: string;        // e.g. "Form score 42% for 35s"
+  formScore: number;
+}
+
+export interface SessionWalletState {
+  address: string;
+  balance: number;     // USDC remaining
+  spent: number;       // USDC total spent
+  funded: number;      // USDC initially funded
+  active: boolean;
+}
+
+export interface AgentGuidanceResponse {
+  text: string;
+  priority: 'low' | 'medium' | 'high';
+  transactionId: string;
+  service: AgentServiceType;
+  cost: string;
+  audioBase64?: string;
+  audioMimeType?: string;
+}
