@@ -82,12 +82,12 @@ export function WorkoutPage() {
         setGuidanceText(response.text);
         setGuidancePriority(response.priority);
 
-        // If it bought voice guidance, play it
-        if (response.service === 'voice-guidance' && response.audioBase64 && !muted) {
-          const url = `data:${response.audioMimeType};base64,${response.audioBase64}`;
+        // Play audio whenever the response contains audio (voice-guidance)
+        if (response.audioBase64 && !muted) {
+          const url = `data:${response.audioMimeType || 'audio/mpeg'};base64,${response.audioBase64}`;
           setAudioUrl(url);
           setVoiceActive(true);
-          setTimeout(() => setVoiceActive(false), 4000);
+          setTimeout(() => setVoiceActive(false), 5000);
         }
       }
     }).catch(err => {
@@ -98,7 +98,10 @@ export function WorkoutPage() {
   // ── End workout ───────────────────────────────────────────────
   const handleEndWorkout = async () => {
     // Refund any remaining session wallet balance
-    refundSessionWallet();
+    const { refundAmount, txId } = refundSessionWallet();
+    if (refundAmount > 0) {
+      sessionStorage.setItem('lastRefund', JSON.stringify({ amount: refundAmount, txId }));
+    }
     
     await endSession();
     if (session?.sessionId) {

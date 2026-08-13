@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader, AlertCircle, Dumbbell, ChevronRight } from 'lucide-react';
+import { Loader, AlertCircle, Dumbbell, ChevronRight, CheckCircle } from 'lucide-react';
 import { ProgressReport } from '../components/ProgressReport';
-import { workoutApi, mockWorkoutApi } from '../services/workoutApi';
+import { workoutApi } from '../services/workoutApi';
 import type { WorkoutReport } from '../types';
 
-const isDev = import.meta.env.DEV;
-const api = isDev ? mockWorkoutApi : workoutApi;
+const api = workoutApi;
 
 export function ReportPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -14,6 +13,16 @@ export function ReportPage() {
   const [report, setReport] = useState<WorkoutReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refund, setRefund] = useState<{ amount: number; txId: string } | null>(null);
+
+  useEffect(() => {
+    // Read and clear any pending refund notification
+    const stored = sessionStorage.getItem('lastRefund');
+    if (stored) {
+      try { setRefund(JSON.parse(stored)); } catch {}
+      sessionStorage.removeItem('lastRefund');
+    }
+  }, []);
 
   useEffect(() => {
     if (!sessionId) {
@@ -50,6 +59,35 @@ export function ReportPage() {
             </p>
           )}
         </div>
+
+        {/* Refund Banner */}
+        {refund && refund.amount > 0 && (
+          <div
+            className="animate-fade-up"
+            style={{
+              marginBottom: '24px',
+              padding: '16px 20px',
+              borderRadius: '14px',
+              background: 'linear-gradient(135deg, rgba(39, 174, 96, 0.12), rgba(39, 174, 96, 0.05))',
+              border: '1px solid rgba(39, 174, 96, 0.3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '14px',
+            }}
+          >
+            <div className="neu-circle" style={{ width: 44, height: 44, flexShrink: 0, boxShadow: '4px 4px 10px var(--neu-shadow-dark), -4px -4px 10px var(--neu-shadow-light), 0 0 12px rgba(39,174,96,0.3)' }}>
+              <CheckCircle size={22} color="var(--success)" />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ fontWeight: 700, color: 'var(--success)', margin: 0, fontSize: '0.95rem' }}>
+                Session Wallet Refunded
+              </p>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', margin: '2px 0 0 0' }}>
+                <strong style={{ color: 'var(--success)' }}>{refund.amount.toFixed(4)} USDC</strong> returned to your wallet — unspent balance refunded automatically.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* States */}
         {loading && (

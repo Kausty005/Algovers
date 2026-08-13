@@ -34,6 +34,7 @@ class WorkoutSession:
             "repCount": self.rep_count,
             "correctReps": self.correct_reps,
             "incorrectReps": self.incorrect_reps,
+            "formScores": self.form_scores,
             "movementState": self.movement_state,
             "status": self.status,
         }

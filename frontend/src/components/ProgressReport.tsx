@@ -10,7 +10,11 @@ function pad(n: number) {
 }
 
 function formatDuration(s: number) {
-  return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
+  const totalSeconds = Math.round(s);
+  const m = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  if (m === 0) return `${secs}s`;
+  return `${m}m ${secs}s`;
 }
 
 interface StatCardProps {
@@ -160,6 +164,38 @@ export function ProgressReport({ report }: Props) {
           </p>
         </div>
       </div>
+
+      {/* Download Action */}
+      <button
+        onClick={() => {
+          const reportText = `Workout Session Report
+Exercise: ${report.exercise.replace('_', ' ')}
+Date: ${new Date().toLocaleString()}
+
+Duration: ${formatDuration(report.durationSeconds)}
+Form Score: ${formPct}%
+Total Reps: ${report.totalReps}
+Correct Reps: ${report.correctReps}
+Incorrect Reps: ${report.incorrectReps}
+
+Improvement: ${improved ? '+' : '-'}${Math.abs(report.improvementPercentage).toFixed(1)}% vs previous session
+Previous Session Reps: ${report.previousReps}
+`;
+          const blob = new Blob([reportText], { type: 'text/plain' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `ironiq-report-${report.exercise}-${report.sessionId}.txt`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }}
+        className="neu-btn neu-btn-accent"
+        style={{ width: '100%', marginTop: '16px', padding: '14px' }}
+      >
+        <span style={{ fontWeight: 700 }}>Download Report (.txt)</span>
+      </button>
     </div>
   );
 }

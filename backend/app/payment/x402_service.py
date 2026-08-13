@@ -171,6 +171,9 @@ def _apply_demo_middleware(app: Flask) -> None:
                 if path in PROTECTED_AI_PATHS:
                     price = PROTECTED_AI_PATHS[path]["price"]
                     desc = PROTECTED_AI_PATHS[path]["desc"]
+                elif path in PROTECTED_AGENT_PATHS:
+                    price = PROTECTED_AGENT_PATHS[path]["price"]
+                    desc = PROTECTED_AGENT_PATHS[path]["desc"]
 
                 # Convert decimal price to integer micro-units for ExactAvmScheme
                 # USDC (10458941 / 31566704) = 6 decimals, ALGO = 6 decimals

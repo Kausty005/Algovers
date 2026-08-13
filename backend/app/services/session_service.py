@@ -98,23 +98,23 @@ def list_completed_sessions_for_exercise(exercise: str, user_id: str) -> List[Wo
 def get_user_dashboard_stats(user_id: str) -> dict:
     """Get aggregated stats for the user's dashboard."""
     db = get_db()
-    workouts = list(db.workouts.find({"user_id": user_id, "status": "completed"}))
+    workouts = list(db.workouts.find({"userId": user_id, "status": "completed"}))
     
     total_workouts = len(workouts)
-    total_reps = sum(w.get("rep_count", 0) for w in workouts)
-    total_duration = sum((w.get("end_time", 0) - w.get("start_time", 0)) for w in workouts)
+    total_reps = sum(w.get("repCount", 0) for w in workouts)
+    total_duration = sum((w.get("endTime", 0) - w.get("startTime", 0)) for w in workouts)
     
     return {
         "totalWorkouts": total_workouts,
         "totalReps": total_reps,
-        "totalDurationMinutes": round(total_duration / 60, 1),
+        "totalDurationMinutes": round(total_duration / 60, 1) if total_duration > 0 else 0,
         "recentWorkouts": [
             {
-                "id": w["session_id"],
-                "exercise": w["exercise"],
-                "reps": w["rep_count"],
-                "date": w["start_time"]
+                "id": w.get("sessionId", ""),
+                "exercise": w.get("exercise", ""),
+                "reps": w.get("repCount", 0),
+                "date": w.get("startTime", 0)
             }
-            for w in sorted(workouts, key=lambda x: x["start_time"], reverse=True)[:5]
+            for w in sorted(workouts, key=lambda x: x.get("startTime", 0), reverse=True)[:5]
         ]
     }

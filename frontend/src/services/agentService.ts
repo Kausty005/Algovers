@@ -47,7 +47,9 @@ export function resetAgent(): void {
   textGuidancePurchased = false;
   voiceGuidancePurchased = false;
   lastPurchaseTime = 0;
+  lastFailureTime = 0;
   activityLog = [];
+  isPurchasing = false;
 }
 
 /**
@@ -116,20 +118,28 @@ export async function evaluateFrame(
     return null; // Too soon after last purchase
   }
 
-  // ── Determine what to buy ──────────────────────────────────────
-  // The user requested a single combined unlock for both text and voice.
-  const serviceType: 'text-guidance' | 'voice-guidance' = 'voice-guidance';
+  // ── Determine what to buy (escalation: text first, then voice) ──────
+  // Step 1: If text not yet purchased → buy text guidance ($0.01)
+  // Step 2: If text already purchased but voice not → buy voice guidance ($0.02)
+  // Step 3: If both purchased → replay voice guidance for free (re-fetch with replay token)
+  let serviceType: 'text-guidance' | 'voice-guidance';
+  let isAlreadyPurchased = false;
 
-  // If already purchased, it's free! Stop calculating budget.
-  const isAlreadyPurchased = 
-    (serviceType === 'text-guidance' && textGuidancePurchased) ||
-    (serviceType === 'voice-guidance' && voiceGuidancePurchased);
+  if (!textGuidancePurchased) {
+    serviceType = 'text-guidance';
+  } else if (!voiceGuidancePurchased) {
+    serviceType = 'voice-guidance';
+  } else {
+    // Both purchased — replay voice guidance without charging again
+    serviceType = 'voice-guidance';
+    isAlreadyPurchased = true;
+  }
 
   const price = isAlreadyPurchased ? 0 : SERVICE_PRICES[serviceType];
 
   // ── Check if session wallet is active ──────────────────────
   const sessionAccount = getSessionAccount();
-  if (!sessionAccount && price > 0) {
+  if (!sessionAccount && !isAlreadyPurchased) {
     console.warn(`[IronIQ Agent] No session account to afford ${serviceType}.`);
     return null;
   }
@@ -210,11 +220,14 @@ async function purchaseGuidance(
   const url = `${BASE_URL}/api/agent/${service}`;
   const sessionAccount = getSessionAccount();
 
-  // If there's no session account (e.g. bypass is on), just use normal fetch
-  if (!sessionAccount) {
+  // If already purchased — replay with a token header so backend lets it through
+  if (isAlreadyPurchased || !sessionAccount) {
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-PAYMENT': `replay-${service}-${Date.now()}`,
+      },
       body: JSON.stringify(data),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
